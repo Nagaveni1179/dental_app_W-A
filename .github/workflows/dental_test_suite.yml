@@ -1,4 +1,4 @@
-﻿name: 🦷 Dental Insight — Full Test Suite (300 Tests)
+name: 🦷 Dental Insight — Full Test Suite (300 Tests)
 
 on:
   push:
@@ -391,6 +391,8 @@ jobs:
     name: "Compile Master Report & Deploy"
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: write
     needs:
       - selenium-web-tests
       - appium-android-tests
