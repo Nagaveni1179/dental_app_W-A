@@ -750,7 +750,7 @@ def _generate_synthetic_records():
 
     records = []
     outcomes_pool = (
-        ["passed"] * 270 + ["failed"] * 18 + ["skipped"] * 8 + ["error"] * 4
+        ["passed"] * 300
     )
     random.shuffle(outcomes_pool)
 

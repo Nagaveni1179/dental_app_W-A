@@ -56,8 +56,7 @@ jobs:
           python -m pytest tests/test_api.py \
             --json-report \
             --json-report-file=selenium-web-report.json \
-            --tb=short -q --timeout=30 \
-            -k "TC001 or TC002 or TC003 or TC011 or TC012 or TC021 or TC030 or TC041 or TC050 or TC060 or TC070 or TC080 or TC081 or TC090 or TC100 or TC110 or TC141 or TC150 or TC160 or TC170 or TC171 or TC180 or TC190 or TC200 or TC201 or TC210 or TC220 or TC221 or TC230 or TC240 or TC251 or TC260" \
+            --tb=short -q --timeout=30 \ \
             || true
 
       - name: 📊 Generate Selenium Web Excel Report
@@ -111,8 +110,7 @@ jobs:
           python -m pytest tests/test_api.py \
             --json-report \
             --json-report-file=appium-android-report.json \
-            --tb=short -q --timeout=30 \
-            -k "Authentication or Scan or Pain or Anesthesia or Appointment or Consultation" \
+            --tb=short -q --timeout=30 \ \
             || true
 
       - name: 📊 Generate Appium Android Excel Report
@@ -240,8 +238,7 @@ jobs:
           python -m pytest tests/test_api.py \
             --json-report \
             --json-report-file=validation-test-report.json \
-            --tb=short -q --timeout=30 \
-            -k "Validation or Security or Edge or TC241 or TC242 or TC243 or TC244 or TC245 or TC246 or TC247 or TC248 or TC249 or TC250 or TC251 or TC252 or TC253 or TC254 or TC255 or TC256 or TC257 or TC258 or TC259 or TC260 or TC261 or TC262 or TC263 or TC264 or TC265 or TC266 or TC267 or TC268 or TC269 or TC270 or TC271 or TC272 or TC273 or TC274 or TC275 or TC276 or TC277 or TC278 or TC279 or TC280" \
+            --tb=short -q --timeout=30 \ \
             || true
 
       - name: 📊 Generate Validation Excel Report
@@ -304,8 +301,7 @@ jobs:
           python -m pytest tests/test_api.py \
             --json-report \
             --json-report-file=deployment-test-report.json \
-            --tb=line -q --timeout=15 \
-            -k "TC291 or TC292 or TC293 or TC294 or TC295 or TC296 or TC297 or TC298 or TC299 or TC300" \
+            --tb=line -q --timeout=15 \ \
             || true
 
       - name: 🛑 Stop Flask Backend
@@ -365,8 +361,7 @@ jobs:
           python -m pytest tests/test_api.py \
             --json-report \
             --json-report-file=load-test-report.json \
-            --tb=short -q --timeout=60 \
-            -k "Performance or Load or TC281 or TC282 or TC283 or TC284 or TC285 or TC286 or TC287 or TC288 or TC289 or TC290 or TC291 or TC292 or TC293 or TC294 or TC295 or TC296 or TC297 or TC298 or TC299 or TC300" \
+            --tb=short -q --timeout=60 \ \
             || true
 
       - name: 📊 Generate Load Test Excel Report
