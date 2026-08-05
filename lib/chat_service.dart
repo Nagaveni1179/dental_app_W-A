@@ -4,9 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:mime/mime.dart';
 
 class ChatService {
-  static const List<String> _apiKeys = [
-    
-  ];
+  static const List<String> _apiKeys = [""];
 
   static const String _baseUrl =
       "https://api.groq.com/openai/v1/chat/completions";
@@ -34,7 +32,8 @@ class ChatService {
   // 2. ANESTHESIA FAILURE PREDICTION (text reasoning)
   // ---------------------------------------------------------------------------
   Future<String> predictAnesthesiaFailure(Map<String, String> data) async {
-    final prompt = '''
+    final prompt =
+        '''
 Assess the likelihood of LOCAL ANESTHESIA FAILURE for a dental patient based on the details below.
 Return your answer in this exact structure:
 
@@ -75,7 +74,8 @@ Patient details:
   // 3. PAIN SEVERITY COMMENTARY (text reasoning)
   // ---------------------------------------------------------------------------
   Future<String> painAdvice(int score, Map<String, String> symptoms) async {
-    final prompt = '''
+    final prompt =
+        '''
 A patient has a calculated dental pain severity score of $score/100.
 Symptoms reported: ${jsonEncode(symptoms)}
 
@@ -104,8 +104,11 @@ Keep it under 120 words.''';
   // ---------------------------------------------------------------------------
   // INTERNAL HELPERS
   // ---------------------------------------------------------------------------
-  Future<String> _sendTextRequest(String message, String apiKey,
-      {required String system}) async {
+  Future<String> _sendTextRequest(
+    String message,
+    String apiKey, {
+    required String system,
+  }) async {
     final response = await http.post(
       Uri.parse(_baseUrl),
       headers: {
@@ -116,7 +119,7 @@ Keep it under 120 words.''';
         'model': _textModel,
         'messages': [
           {'role': 'system', 'content': system},
-          {'role': 'user', 'content': message}
+          {'role': 'user', 'content': message},
         ],
         'temperature': 0.5,
         'max_tokens': 1024,
@@ -140,7 +143,10 @@ Keep it under 120 words.''';
   }
 
   Future<String> _sendImageRequest(
-      File imageFile, String apiKey, String? notes) async {
+    File imageFile,
+    String apiKey,
+    String? notes,
+  ) async {
     final fileSize = await imageFile.length();
     if (fileSize > 4 * 1024 * 1024) {
       return "Image is too large. Please use an image smaller than 4MB.";
@@ -150,7 +156,8 @@ Keep it under 120 words.''';
     final base64Image = base64Encode(imageBytes);
     final mimeType = lookupMimeType(imageFile.path) ?? 'image/jpeg';
 
-    final analysisPrompt = '''
+    final analysisPrompt =
+        '''
 Analyze this oral / dental image and provide a structured assessment:
 
 CONDITION DETECTED: cavities, tooth decay, plaque, gum infection, discoloration, or other visible issues
@@ -174,7 +181,7 @@ Important: This is a screening aid, not a diagnosis. Recommend professional cons
           {
             'role': 'system',
             'content':
-                '''You are Dental Insight AI, an expert dental vision assistant. You identify visible oral conditions (cavities, decay, plaque, gum infection, discoloration) from images and provide clear, safe, actionable guidance. Always remind the user this is a screening aid and not a replacement for a dentist.'''
+                '''You are Dental Insight AI, an expert dental vision assistant. You identify visible oral conditions (cavities, decay, plaque, gum infection, discoloration) from images and provide clear, safe, actionable guidance. Always remind the user this is a screening aid and not a replacement for a dentist.''',
           },
           {
             'role': 'user',
@@ -182,10 +189,10 @@ Important: This is a screening aid, not a diagnosis. Recommend professional cons
               {'type': 'text', 'text': analysisPrompt},
               {
                 'type': 'image_url',
-                'image_url': {'url': 'data:$mimeType;base64,$base64Image'}
-              }
-            ]
-          }
+                'image_url': {'url': 'data:$mimeType;base64,$base64Image'},
+              },
+            ],
+          },
         ],
         'temperature': 0.6,
         'max_completion_tokens': 1024,

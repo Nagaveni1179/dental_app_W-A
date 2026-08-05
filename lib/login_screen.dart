@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'api_service.dart';
+import 'url.dart';
 import 'session.dart';
 import 'signup_screen.dart';
 import 'patient_home.dart';
@@ -25,9 +28,16 @@ const double kRadius = 16.0;
 const EdgeInsets kPagePad = EdgeInsets.all(20);
 
 const TextStyle kH1 = TextStyle(
-    fontSize: 26, fontWeight: FontWeight.w700, color: kText, height: 1.2);
+  fontSize: 26,
+  fontWeight: FontWeight.w700,
+  color: kText,
+  height: 1.2,
+);
 const TextStyle kH2 = TextStyle(
-    fontSize: 19, fontWeight: FontWeight.w700, color: kText);
+  fontSize: 19,
+  fontWeight: FontWeight.w700,
+  color: kText,
+);
 const TextStyle kBody = TextStyle(fontSize: 14.5, color: kText, height: 1.45);
 const TextStyle kSub = TextStyle(fontSize: 13, color: kTextLight);
 
@@ -36,26 +46,26 @@ BoxDecoration kCardDeco = BoxDecoration(
   borderRadius: BorderRadius.circular(kRadius),
   border: Border.all(color: kBorder),
   boxShadow: const [
-    BoxShadow(color: Color(0x0A0F2C33), blurRadius: 14, offset: Offset(0, 6))
+    BoxShadow(color: Color(0x0A0F2C33), blurRadius: 14, offset: Offset(0, 6)),
   ],
 );
 
 InputDecoration kInput(String hint, IconData icon) => InputDecoration(
-      hintText: hint,
-      prefixIcon: Icon(icon, color: kPrimary, size: 20),
-      hintStyle: const TextStyle(color: kTextLight, fontSize: 14),
-      filled: true,
-      fillColor: kBg,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: kBorder),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: kPrimary, width: 1.6),
-      ),
-    );
+  hintText: hint,
+  prefixIcon: Icon(icon, color: kPrimary, size: 20),
+  hintStyle: const TextStyle(color: kTextLight, fontSize: 14),
+  filled: true,
+  fillColor: kBg,
+  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+  enabledBorder: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(12),
+    borderSide: const BorderSide(color: kBorder),
+  ),
+  focusedBorder: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(12),
+    borderSide: const BorderSide(color: kPrimary, width: 1.6),
+  ),
+);
 
 // ============================================================================
 // LOGIN SCREEN
@@ -84,8 +94,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     // Admin is handled entirely on the frontend.
-    if (_email.text.trim() == _adminEmail &&
-        _password.text == _adminPassword) {
+    if (_email.text.trim() == _adminEmail && _password.text == _adminPassword) {
       Session.setUser(
         id: 0,
         userName: 'Administrator',
@@ -128,8 +137,9 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _snack(String m) => ScaffoldMessenger.of(context)
-      .showSnackBar(SnackBar(content: Text(m), backgroundColor: kPrimaryDark));
+  void _snack(String m) => ScaffoldMessenger.of(
+    context,
+  ).showSnackBar(SnackBar(content: Text(m), backgroundColor: kPrimaryDark));
 
   @override
   Widget build(BuildContext context) {
@@ -148,20 +158,27 @@ class _LoginScreenState extends State<LoginScreen> {
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                      colors: [kPrimary, kAccent],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight),
+                    colors: [kPrimary, kAccent],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
                   borderRadius: BorderRadius.circular(24),
                 ),
-                child: const Icon(Icons.medical_services_rounded,
-                    color: Colors.white, size: 42),
+                child: const Icon(
+                  Icons.medical_services_rounded,
+                  color: Colors.white,
+                  size: 42,
+                ),
               ),
               const SizedBox(height: 22),
               const Center(child: Text('Dental Insight', style: kH1)),
               const SizedBox(height: 6),
               const Center(
-                child: Text('AI-powered oral health assessment',
-                    style: kSub, textAlign: TextAlign.center),
+                child: Text(
+                  'AI-powered oral health assessment',
+                  style: kSub,
+                  textAlign: TextAlign.center,
+                ),
               ),
               const SizedBox(height: 36),
               TextField(
@@ -173,20 +190,48 @@ class _LoginScreenState extends State<LoginScreen> {
               TextField(
                 controller: _password,
                 obscureText: _obscure,
-                decoration:
-                    kInput('Password', Icons.lock_outline).copyWith(
+                decoration: kInput('Password', Icons.lock_outline).copyWith(
                   suffixIcon: IconButton(
                     icon: Icon(
-                        _obscure
-                            ? Icons.visibility_off_outlined
-                            : Icons.visibility_outlined,
-                        color: kTextLight,
-                        size: 20),
+                      _obscure
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                      color: kTextLight,
+                      size: 20,
+                    ),
                     onPressed: () => setState(() => _obscure = !_obscure),
                   ),
                 ),
               ),
-              const SizedBox(height: 26),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: _showForgotPasswordDialog,
+                  icon: const Icon(
+                    Icons.lock_reset_rounded,
+                    size: 18,
+                    color: kPrimary,
+                  ),
+                  label: const Text(
+                    'Forgot Password?',
+                    style: TextStyle(
+                      color: kPrimary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      decoration: TextDecoration.underline,
+                      decorationColor: kPrimary,
+                    ),
+                  ),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 6,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
               SizedBox(
                 height: 52,
                 child: ElevatedButton(
@@ -196,17 +241,25 @@ class _LoginScreenState extends State<LoginScreen> {
                     foregroundColor: Colors.white,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14)),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                   ),
                   child: _loading
                       ? const SizedBox(
                           height: 22,
                           width: 22,
                           child: CircularProgressIndicator(
-                              color: Colors.white, strokeWidth: 2.4))
-                      : const Text('Log In',
+                            color: Colors.white,
+                            strokeWidth: 2.4,
+                          ),
+                        )
+                      : const Text(
+                          'Log In',
                           style: TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.w600)),
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(height: 18),
@@ -215,16 +268,148 @@ class _LoginScreenState extends State<LoginScreen> {
                 children: [
                   const Text("Don't have an account? ", style: kSub),
                   GestureDetector(
-                    onTap: () => Navigator.push(context,
-                        MaterialPageRoute(builder: (_) => const SignupScreen())),
-                    child: const Text('Sign Up',
-                        style: TextStyle(
-                            color: kPrimary, fontWeight: FontWeight.w700)),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const SignupScreen()),
+                    ),
+                    child: const Text(
+                      'Sign Up',
+                      style: TextStyle(
+                        color: kPrimary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
                 ],
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  void _showForgotPasswordDialog() {
+    final resetEmailCtrl = TextEditingController(text: _email.text.trim());
+    final newPassCtrl = TextEditingController();
+    bool isResetting = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDlgState) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: kPrimary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.lock_reset, color: kPrimary, size: 22),
+              ),
+              const SizedBox(width: 10),
+              const Text(
+                'Reset Password',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Enter your registered email address and a new password below.',
+                style: kSub,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: resetEmailCtrl,
+                keyboardType: TextInputType.emailAddress,
+                decoration: kInput('Registered Email', Icons.email_outlined),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: newPassCtrl,
+                obscureText: true,
+                decoration: kInput(
+                  'New Password (min 6 chars)',
+                  Icons.lock_outline,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel', style: TextStyle(color: kTextLight)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kPrimary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              onPressed: isResetting
+                  ? null
+                  : () async {
+                      if (resetEmailCtrl.text.trim().isEmpty ||
+                          newPassCtrl.text.isEmpty) {
+                        _snack('Please fill in all fields');
+                        return;
+                      }
+                      if (newPassCtrl.text.length < 6) {
+                        _snack('Password must be at least 6 characters');
+                        return;
+                      }
+
+                      setDlgState(() => isResetting = true);
+                      try {
+                        final res = await http.post(
+                          Uri.parse('${Url.baseUrl}/reset_password'),
+                          headers: {'Content-Type': 'application/json'},
+                          body: jsonEncode({
+                            'email': resetEmailCtrl.text.trim(),
+                            'new_password': newPassCtrl.text,
+                          }),
+                        );
+                        final body = jsonDecode(res.body);
+                        if (!mounted) return;
+                        Navigator.pop(ctx);
+
+                        if (res.statusCode == 200) {
+                          _snack(
+                            'Password reset successfully! Sign in with your new password.',
+                          );
+                        } else {
+                          _snack(body['error'] ?? 'Password reset failed');
+                        }
+                      } catch (e) {
+                        if (!mounted) return;
+                        Navigator.pop(ctx);
+                        _snack('Network error: $e');
+                      }
+                    },
+              child: isResetting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Text(
+                      'Reset Password',
+                      style: TextStyle(color: Colors.white),
+                    ),
+            ),
+          ],
         ),
       ),
     );

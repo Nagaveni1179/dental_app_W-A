@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'url.dart';
+import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
 
 // Centralized HTTP layer — connected to the Flask backend.
 // Set the Railway URL in url.dart. Admin login is handled in the frontend only.
@@ -54,7 +56,7 @@ class ApiService {
   static Future<Map<String, dynamic>> uploadScan({
     required int patientId,
     required String patientName,
-    required File image,
+    required XFile image,
     String notes = '',
     String condition = '',
     String severity = 'Mild',
@@ -62,7 +64,10 @@ class ApiService {
     String summary = '',
   }) async {
     try {
-      final req = http.MultipartRequest('POST', Uri.parse("$_base/scans"));
+      final url = "$_base/scans";
+      print('[ApiService] uploadScan → POST $url');
+
+      final req = http.MultipartRequest('POST', Uri.parse(url));
       req.fields['patient_id'] = patientId.toString();
       req.fields['patient_name'] = patientName;
       req.fields['notes'] = notes;
@@ -72,17 +77,45 @@ class ApiService {
       req.fields['summary'] = summary;
       req.fields['findings'] = '[]';
       req.fields['recommendations'] = '[]';
-      req.files.add(await http.MultipartFile.fromPath('image', image.path));
-      final streamed = await req.send();
-      final body = await streamed.stream.bytesToString();
-      return jsonDecode(body);
+
+      if (kIsWeb) {
+        final bytes = await image.readAsBytes();
+        final fileName = image.name.isNotEmpty ? image.name : 'scan.jpg';
+        print('[ApiService] Web upload: ${bytes.length} bytes, filename: $fileName');
+
+        req.files.add(
+          http.MultipartFile.fromBytes('image', bytes, filename: fileName),
+        );
+      } else {
+        print('[ApiService] Native upload: ${image.path}');
+        req.files.add(await http.MultipartFile.fromPath('image', image.path));
+      }
+
+      print('[ApiService] Sending request...');
+      final response = await req.send();
+      final body = await response.stream.bytesToString();
+
+      print('[ApiService] Response status: ${response.statusCode}');
+      final preview = body.length > 300 ? '${body.substring(0, 300)}...' : body;
+      print('[ApiService] Response body: $preview');
+
+      final decoded = jsonDecode(body);
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        print('[ApiService] Server returned error: ${decoded['error'] ?? 'unknown'}');
+      }
+      return decoded;
     } catch (e) {
-      return {'error': 'Upload failed: $e'};
+      print('[ApiService] uploadScan EXCEPTION: $e');
+      return {'error': 'Network error: $e'};
     }
   }
 
   static Future<List<dynamic>> getPatientScans(int userId) =>
       _getList("$_base/scans/patient/$userId");
+
+  // Fetch all scans across all patients, optionally filtering by review status.
+  static Future<List<dynamic>> getAllScans({String? status}) =>
+      _getList(status == null ? "$_base/scans" : "$_base/scans?status=$status");
 
   // Dentist saves a recommendation/review on a scan.
   static Future<Map<String, dynamic>> reviewScan(
@@ -101,6 +134,9 @@ class ApiService {
       _post("$_base/pain", payload);
 
   static Future<List<dynamic>> getPatientPain(int userId) =>
+      _getList("$_base/pain/patient/$userId");
+
+  static Future<List<dynamic>> getPatientPainHistory(int userId) =>
       _getList("$_base/pain/patient/$userId");
 
   // ── ANESTHESIA ────────────────────────────────────────

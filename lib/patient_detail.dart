@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'login_screen.dart';
 import 'api_service.dart';
@@ -250,15 +251,21 @@ class _PatientDetailState extends State<PatientDetail> {
         ),
         child: url.isEmpty
             ? _imagePlaceholder()
-            : Image.network(
-          url,
-          fit: BoxFit.cover,
-          loadingBuilder: (context, child, progress) => progress == null
-              ? child
-              : const Center(
-              child: CircularProgressIndicator(color: kPrimary)),
-          errorBuilder: (_, __, ___) => _imagePlaceholder(),
-        ),
+            : url.startsWith('data:image')
+                ? Image.memory(
+                    base64Decode(url.split(',').last),
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => _imagePlaceholder(),
+                  )
+                : Image.network(
+                    url,
+                    fit: BoxFit.cover,
+                    loadingBuilder: (context, child, progress) => progress == null
+                        ? child
+                        : const Center(
+                            child: CircularProgressIndicator(color: kPrimary)),
+                    errorBuilder: (_, __, ___) => _imagePlaceholder(),
+                  ),
       ),
     );
   }

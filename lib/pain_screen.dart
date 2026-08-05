@@ -43,17 +43,9 @@ class _PainScreenState extends State<PainScreen> {
       _loading = true;
       _advice = null;
     });
-    final advice = await _chat.painAdvice(score, {
-      'intensity': _intensity.round().toString(),
-      'duration': _duration,
-      'trigger': _trigger,
-      'swelling': _swelling.toString(),
-      'sensitivity': _sensitivity.toString(),
-      'bleeding': _bleeding.toString(),
-    });
 
     // Save to backend.
-    await ApiService.addPain({
+    final result = await ApiService.addPain({
       'patient_id': Session.userId,
       'patient_name': Session.name,
       'intensity': _intensity.round(),
@@ -64,11 +56,10 @@ class _PainScreenState extends State<PainScreen> {
       'bleeding': _bleeding,
       'score': score,
       'severity': _scoreLabel(score),
-      'advice': advice,
     });
 
     setState(() {
-      _advice = advice;
+      _advice = result['advice'] ?? "No advice available.";
       _loading = false;
     });
   }
@@ -94,9 +85,13 @@ class _PainScreenState extends State<PainScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Pain intensity: ${_intensity.round()}/10',
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w700, color: kText)),
+                  Text(
+                    'Pain intensity: ${_intensity.round()}/10',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: kText,
+                    ),
+                  ),
                   Slider(
                     value: _intensity,
                     min: 0,
@@ -110,25 +105,39 @@ class _PainScreenState extends State<PainScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            _dropdownCard('How long has it lasted?', _duration,
-                ['A few hours', 'A few days', 'A week or more'],
-                (v) => setState(() => _duration = v)),
+            _dropdownCard(
+              'How long has it lasted?',
+              _duration,
+              ['A few hours', 'A few days', 'A week or more'],
+              (v) => setState(() => _duration = v),
+            ),
             const SizedBox(height: 16),
-            _dropdownCard('When does it hurt?', _trigger,
-                ['When eating', 'When cold/hot', 'Constant'],
-                (v) => setState(() => _trigger = v)),
+            _dropdownCard('When does it hurt?', _trigger, [
+              'When eating',
+              'When cold/hot',
+              'Constant',
+            ], (v) => setState(() => _trigger = v)),
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
               decoration: kCardDeco,
               child: Column(
                 children: [
-                  _switch('Swelling present', _swelling,
-                      (v) => setState(() => _swelling = v)),
-                  _switch('Tooth sensitivity', _sensitivity,
-                      (v) => setState(() => _sensitivity = v)),
-                  _switch('Gum bleeding', _bleeding,
-                      (v) => setState(() => _bleeding = v)),
+                  _switch(
+                    'Swelling present',
+                    _swelling,
+                    (v) => setState(() => _swelling = v),
+                  ),
+                  _switch(
+                    'Tooth sensitivity',
+                    _sensitivity,
+                    (v) => setState(() => _sensitivity = v),
+                  ),
+                  _switch(
+                    'Gum bleeding',
+                    _bleeding,
+                    (v) => setState(() => _bleeding = v),
+                  ),
                 ],
               ),
             ),
@@ -142,11 +151,13 @@ class _PainScreenState extends State<PainScreen> {
                   foregroundColor: Colors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                 ),
-                child: const Text('Calculate Pain Score',
-                    style:
-                        TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                child: const Text(
+                  'Calculate Pain Score',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
               ),
             ),
             if (_score != null) ...[
@@ -157,11 +168,14 @@ class _PainScreenState extends State<PainScreen> {
                 decoration: kCardDeco,
                 child: Column(
                   children: [
-                    Text('$_score',
-                        style: TextStyle(
-                            fontSize: 48,
-                            fontWeight: FontWeight.w800,
-                            color: _scoreColor(_score!))),
+                    Text(
+                      '$_score',
+                      style: TextStyle(
+                        fontSize: 48,
+                        fontWeight: FontWeight.w800,
+                        color: _scoreColor(_score!),
+                      ),
+                    ),
                     Text('out of 100  •  ${_scoreLabel(_score!)}', style: kSub),
                     const SizedBox(height: 14),
                     LinearProgressIndicator(
@@ -192,24 +206,30 @@ class _PainScreenState extends State<PainScreen> {
     );
   }
 
-  Widget _dropdownCard(String title, String value, List<String> opts,
-      void Function(String) onChanged) {
+  Widget _dropdownCard(
+    String title,
+    String value,
+    List<String> opts,
+    void Function(String) onChanged,
+  ) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: kCardDeco,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title,
-              style:
-                  const TextStyle(fontWeight: FontWeight.w700, color: kText)),
+          Text(
+            title,
+            style: const TextStyle(fontWeight: FontWeight.w700, color: kText),
+          ),
           const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
-                color: kBg,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: kBorder)),
+              color: kBg,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: kBorder),
+            ),
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String>(
                 value: value,
@@ -238,9 +258,9 @@ class _PainScreenState extends State<PainScreen> {
 }
 
 AppBar _bar(String title) => AppBar(
-      backgroundColor: kBg,
-      elevation: 0,
-      foregroundColor: kText,
-      centerTitle: false,
-      title: Text(title, style: kH2),
-    );
+  backgroundColor: kBg,
+  elevation: 0,
+  foregroundColor: kText,
+  centerTitle: false,
+  title: Text(title, style: kH2),
+);

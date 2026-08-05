@@ -34,16 +34,21 @@ class _AnesthesiaScreenState extends State<AnesthesiaScreen> {
 
   Future<void> _predict() async {
     if (_region.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
           content: Text('Please enter the tooth / region'),
-          backgroundColor: kPrimaryDark));
+          backgroundColor: kPrimaryDark,
+        ),
+      );
       return;
     }
     setState(() {
       _loading = true;
       _result = null;
     });
-    final res = await _chat.predictAnesthesiaFailure({
+    final response = await ApiService.addAnesthesia({
+      'patient_id': Session.userId,
+      'patient_name': Session.name,
       'age': Session.age == 0 ? 'N/A' : Session.age.toString(),
       'gender': Session.gender.isEmpty ? 'N/A' : Session.gender,
       'region': _region.text.trim(),
@@ -51,10 +56,11 @@ class _AnesthesiaScreenState extends State<AnesthesiaScreen> {
       'inflammation': _inflammation,
       'anxiety': _anxiety,
       'history': _history,
-      'medical': _medical.text.trim().isEmpty ? 'None' : _medical.text.trim(),
-      'medications':
-          _medications.text.trim().isEmpty ? 'None' : _medications.text.trim(),
+      'medical_conditions': _medical.text.trim(),
+      'medications': _medications.text.trim(),
     });
+
+    final res = response['result'] ?? "No prediction available.";
 
     // Save to backend.
     await ApiService.addAnesthesia({
@@ -90,38 +96,63 @@ class _AnesthesiaScreenState extends State<AnesthesiaScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                  color: kDanger.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(kRadius),
-                  border: Border.all(color: kDanger.withOpacity(0.25))),
+                color: kDanger.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(kRadius),
+                border: Border.all(color: kDanger.withOpacity(0.25)),
+              ),
               child: const Text(
-                  'Predicts the risk of local anesthesia failure to help the dentist plan ahead.',
-                  style: kBody),
+                'Predicts the risk of local anesthesia failure to help the dentist plan ahead.',
+                style: kBody,
+              ),
             ),
             const SizedBox(height: 18),
             TextField(
-                controller: _region,
-                decoration: kInput('Tooth / region (e.g. lower left molar)',
-                    Icons.place_outlined)),
+              controller: _region,
+              decoration: kInput(
+                'Tooth / region (e.g. lower left molar)',
+                Icons.place_outlined,
+              ),
+            ),
             const SizedBox(height: 14),
-            _picker('Existing infection / abscess', _infection, ['No', 'Yes'],
-                (v) => setState(() => _infection = v)),
-            _picker('Inflammation severity', _inflammation,
-                ['Mild', 'Moderate', 'Severe'],
-                (v) => setState(() => _inflammation = v)),
-            _picker('Anxiety level', _anxiety, ['Low', 'Medium', 'High'],
-                (v) => setState(() => _anxiety = v)),
-            _picker('Previous anesthesia failure', _history, ['No', 'Yes'],
-                (v) => setState(() => _history = v)),
+            _picker(
+              'Existing infection / abscess',
+              _infection,
+              ['No', 'Yes'],
+              (v) => setState(() => _infection = v),
+            ),
+            _picker(
+              'Inflammation severity',
+              _inflammation,
+              ['Mild', 'Moderate', 'Severe'],
+              (v) => setState(() => _inflammation = v),
+            ),
+            _picker('Anxiety level', _anxiety, [
+              'Low',
+              'Medium',
+              'High',
+            ], (v) => setState(() => _anxiety = v)),
+            _picker(
+              'Previous anesthesia failure',
+              _history,
+              ['No', 'Yes'],
+              (v) => setState(() => _history = v),
+            ),
             const SizedBox(height: 14),
             TextField(
-                controller: _medical,
-                decoration: kInput('Medical conditions (optional)',
-                    Icons.local_hospital_outlined)),
+              controller: _medical,
+              decoration: kInput(
+                'Medical conditions (optional)',
+                Icons.local_hospital_outlined,
+              ),
+            ),
             const SizedBox(height: 14),
             TextField(
-                controller: _medications,
-                decoration: kInput('Current medications (optional)',
-                    Icons.medication_outlined)),
+              controller: _medications,
+              decoration: kInput(
+                'Current medications (optional)',
+                Icons.medication_outlined,
+              ),
+            ),
             const SizedBox(height: 22),
             SizedBox(
               height: 52,
@@ -132,7 +163,10 @@ class _AnesthesiaScreenState extends State<AnesthesiaScreen> {
                         height: 20,
                         width: 20,
                         child: CircularProgressIndicator(
-                            color: Colors.white, strokeWidth: 2.4))
+                          color: Colors.white,
+                          strokeWidth: 2.4,
+                        ),
+                      )
                     : const Icon(Icons.analytics_outlined),
                 label: Text(_loading ? 'Predicting...' : 'Predict Risk'),
                 style: ElevatedButton.styleFrom(
@@ -140,7 +174,8 @@ class _AnesthesiaScreenState extends State<AnesthesiaScreen> {
                   foregroundColor: Colors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                 ),
               ),
             ),
@@ -171,8 +206,12 @@ class _AnesthesiaScreenState extends State<AnesthesiaScreen> {
     );
   }
 
-  Widget _picker(String label, String value, List<String> opts,
-      void Function(String) onChanged) {
+  Widget _picker(
+    String label,
+    String value,
+    List<String> opts,
+    void Function(String) onChanged,
+  ) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: Column(
@@ -180,9 +219,14 @@ class _AnesthesiaScreenState extends State<AnesthesiaScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.only(bottom: 8, left: 2),
-            child: Text(label,
-                style: const TextStyle(
-                    fontWeight: FontWeight.w600, color: kText, fontSize: 13.5)),
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                color: kText,
+                fontSize: 13.5,
+              ),
+            ),
           ),
           Row(
             children: opts.map((o) {
@@ -198,16 +242,20 @@ class _AnesthesiaScreenState extends State<AnesthesiaScreen> {
                       color: selected ? kPrimary.withOpacity(0.12) : kCard,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                          color: selected ? kPrimary : kBorder,
-                          width: selected ? 1.5 : 1),
+                        color: selected ? kPrimary : kBorder,
+                        width: selected ? 1.5 : 1,
+                      ),
                     ),
-                    child: Text(o,
-                        style: TextStyle(
-                            fontSize: 12.5,
-                            color: selected ? kPrimary : kTextLight,
-                            fontWeight: selected
-                                ? FontWeight.w700
-                                : FontWeight.w500)),
+                    child: Text(
+                      o,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: selected ? kPrimary : kTextLight,
+                        fontWeight: selected
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                      ),
+                    ),
                   ),
                 ),
               );
@@ -220,9 +268,9 @@ class _AnesthesiaScreenState extends State<AnesthesiaScreen> {
 }
 
 AppBar _bar(String title) => AppBar(
-      backgroundColor: kBg,
-      elevation: 0,
-      foregroundColor: kText,
-      centerTitle: false,
-      title: Text(title, style: kH2),
-    );
+  backgroundColor: kBg,
+  elevation: 0,
+  foregroundColor: kText,
+  centerTitle: false,
+  title: Text(title, style: kH2),
+);

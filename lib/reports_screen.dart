@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'login_screen.dart';
 import 'api_service.dart';
 import 'session.dart';
@@ -81,7 +83,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
           }
           final reports = snap.data ?? [];
           if (reports.isEmpty) {
-            return const Center(child: Text('No reports yet', style: kSub));
+            return const Center(child: Text('No reports available', style: kSub));
           }
           return RefreshIndicator(
             color: kPrimary,
@@ -223,26 +225,25 @@ class _ReportDetail extends StatelessWidget {
             Text(r['date'], style: kSub),
             const SizedBox(height: 18),
 
-            // Oral image (scans only)
+            // Display oral image (scans only)
             if (isScan && imageUrl.isNotEmpty) ...[
               ClipRRect(
                 borderRadius: BorderRadius.circular(kRadius),
-                child: Image.network(
-                  imageUrl,
-                  height: 220,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    height: 220,
-                    decoration: BoxDecoration(
-                        color: kCard,
-                        borderRadius: BorderRadius.circular(kRadius),
-                        border: Border.all(color: kBorder)),
-                    child: const Center(
-                        child: Icon(Icons.image_not_supported_outlined,
-                            color: kTextLight)),
-                  ),
-                ),
+                child: imageUrl.startsWith('data:')
+                    ? Image.memory(
+                        base64Decode(imageUrl.split(',').last),
+                        height: 220,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => _errorPlaceholder(),
+                      )
+                    : Image.network(
+                        imageUrl,
+                        height: 220,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => _errorPlaceholder(),
+                      ),
               ),
               const SizedBox(height: 18),
             ],
@@ -340,4 +341,18 @@ class _ReportDetail extends StatelessWidget {
   }
 
   Widget _sectionTitle(String t) => Text(t, style: kH2);
+
+  Widget _errorPlaceholder() => Container(
+        height: 220,
+        width: double.infinity,
+        color: kBorder,
+        child: const Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.broken_image_outlined, color: kTextLight, size: 40),
+            SizedBox(height: 8),
+            Text('Image unavailable', style: kSub),
+          ],
+        ),
+      );
 }

@@ -36,7 +36,7 @@ class _DentistHomeState extends State<DentistHome> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: kBg,
-      body: IndexedStack(index: _index, children: _pages),
+      body: _pages[_index],
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           color: kCard,
