@@ -15,6 +15,7 @@ concurrency:
 env:
   PYTHON_VERSION: "3.11"
   DATABASE_URL: "sqlite:///test_dental.db"
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
   GROQ_API_KEY: ${{ secrets.GROQ_API_KEY || 'test_key_ci' }}
   CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME || 'test' }}
   CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY || 'test' }}
