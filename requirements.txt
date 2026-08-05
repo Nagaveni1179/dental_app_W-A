@@ -1,6 +1,11 @@
-flask
-flask-sqlalchemy
-flask-cors
-pymysql
+Flask
+Flask-SQLAlchemy
+Flask-Cors
+PyMySQL
 cloudinary
-werkzeug
+Werkzeug
+gunicorn
+groq
+python-dotenv
+SQLAlchemy
+psycopg2-binary
