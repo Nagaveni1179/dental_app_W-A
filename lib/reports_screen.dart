@@ -5,34 +5,6 @@ import 'login_screen.dart';
 import 'api_service.dart';
 import 'session.dart';
 
-String formatToIST(dynamic rawDate) {
-  if (rawDate == null) return '';
-  final str = rawDate.toString().trim();
-  if (str.isEmpty) return '';
-
-  if (RegExp(r'^\d{2}\s+[A-Za-z]{3}\s+\d{4},\s+\d{2}:\d{2}\s+[AP]M$').hasMatch(str)) {
-    return str;
-  }
-
-  try {
-    final dt = DateTime.parse(str);
-    final istDt = dt.isUtc ? dt.add(const Duration(hours: 5, minutes: 30)) : dt;
-    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    final day = istDt.day.toString().padLeft(2, '0');
-    final month = months[istDt.month - 1];
-    final year = istDt.year;
-    int hour = istDt.hour;
-    final minute = istDt.minute.toString().padLeft(2, '0');
-    final ampm = hour >= 12 ? 'PM' : 'AM';
-    hour = hour % 12;
-    if (hour == 0) hour = 12;
-    final hourStr = hour.toString().padLeft(2, '0');
-    return '$day $month $year, $hourStr:$minute $ampm';
-  } catch (_) {
-    return str;
-  }
-}
-
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
 
@@ -58,7 +30,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         'type': 'scan',
         'title':
         'Oral Scan${s['condition'] != null && s['condition'] != '' ? ' – ${s['condition']}' : ''}',
-        'date': formatToIST(s['created_at']),
+        'date': s['created_at'] ?? '',
         'summary': s['summary'] ?? s['analysis'] ?? '',
         'analysis': s['analysis'] ?? '',
         'image_url': s['image_url'] ?? '',
@@ -71,7 +43,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       combined.add({
         'type': 'pain',
         'title': 'Pain Assessment',
-        'date': formatToIST(p['created_at']),
+        'date': p['created_at'] ?? '',
         'summary': 'Severity score ${p['score']}/100 (${p['severity']}).',
         'analysis': p['advice'] ?? '',
         'score': p['score'] ?? 0,

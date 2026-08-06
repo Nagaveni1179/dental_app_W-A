@@ -3,7 +3,7 @@ from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 import zoneinfo
 import os
 import json
@@ -13,52 +13,23 @@ from groq import Groq
 import sys
 import io
 
-# Define IST timezone (+05:30) for reliable local timestamp handling
-IST = timezone(timedelta(hours=5, minutes=30))
-
-def get_utc_now():
-    """Returns timezone-aware UTC datetime for database storage."""
-    return datetime.now(timezone.utc)
-
-def format_local_dt(dt):
-    """
-    Converts UTC datetime object or ISO string into Asia/Kolkata (IST)
-    formatted string: 'dd MMM yyyy, hh:mm a' (e.g. '06 Aug 2026, 10:45 AM').
-    """
-    if not dt:
-        return ""
-    if isinstance(dt, str):
-        try:
-            dt = datetime.fromisoformat(dt)
-        except Exception:
-            return dt
-
-    # If datetime object has no tzinfo, treat as UTC stored in DB
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-
+def get_ist_now():
+    """Returns current datetime in Asia/Kolkata (IST) timezone without tzinfo for MySQL compatibility."""
     try:
         ist = zoneinfo.ZoneInfo("Asia/Kolkata")
+        return datetime.now(ist).replace(tzinfo=None)
     except Exception:
-        ist = IST
+        # Fallback if zoneinfo tz database is missing on system
+        return datetime.now()
 
-    ist_dt = dt.astimezone(ist)
-    return ist_dt.strftime('%d %b %Y, %I:%M %p')
+def format_local_dt(dt):
+    """Formats datetime object into user-friendly IST local string."""
+    if not dt:
+        return None
+    # If naive datetime from DB, treat as IST local time
+    return dt.strftime('%d %b %Y, %I:%M %p')
 
-def clean_thinking_text(text):
-    """Removes raw model thinking blocks <think>...</think> from response text."""
-    if not text:
-        return ""
-    if not isinstance(text, str):
-        text = str(text)
-    # Strip </think> trailing block
-    if '</think>' in text:
-        text = text.split('</think>')[-1].strip()
-    # Strip <think>...</think> blocks
-    text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL | re.IGNORECASE).strip()
-    # Also strip any unclosed <think>... blocks if model output was truncated
-    text = re.sub(r'<think>.*$', '', text, flags=re.DOTALL | re.IGNORECASE).strip()
-    return text
+
 
 # Force UTF-8 output streams on Windows to prevent 'charmap' codec errors when printing emojis/Unicode
 if hasattr(sys.stdout, 'reconfigure'):
@@ -68,14 +39,35 @@ else:
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
+import re
+
 def sanitize_text(text):
     """Ensure text is valid UTF-8 and safely encodeable without surrogate/charmap errors."""
     if not text:
         return ""
+
     if not isinstance(text, str):
         text = str(text)
-    return text.encode('utf-8', errors='replace').decode('utf-8')
 
+    return text.encode("utf-8", errors="replace").decode("utf-8")
+
+
+def clean_thinking_text(text):
+    """Remove <think>...</think> reasoning and return only the final answer."""
+    if not text:
+        return ""
+
+    if not isinstance(text, str):
+        text = str(text)
+
+    # Remove everything between <think> and </think>
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
+
+    # If there is no closing </think>, remove everything before the last </think>-style block
+    if "</think>" in text:
+        text = text.split("</think>", 1)[1]
+
+    return text.strip()
 def safe_print(*args, **kwargs):
     """Safely print text to standard output on Windows systems."""
     try:
@@ -95,14 +87,6 @@ import cloudinary.uploader
 
 app = Flask(__name__)
 CORS(app)
-
-@app.template_filter('format_local_dt')
-def jinja_format_local_dt(dt):
-    return format_local_dt(dt)
-
-@app.template_filter('clean_thinking')
-def jinja_clean_thinking(text):
-    return clean_thinking_text(text)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
     "DATABASE_URL",
@@ -140,13 +124,13 @@ class User(db.Model):
     age            = db.Column(db.Integer, default=0)
     gender         = db.Column(db.String(10), nullable=True)
     specialization = db.Column(db.String(150), nullable=True)     # dentists only
-    created_at     = db.Column(db.DateTime, default=get_utc_now)
+    created_at     = db.Column(db.DateTime, default=get_ist_now)
 
 class ActiveSession(db.Model):
     __tablename__ = 'active_sessions'
     id       = db.Column(db.Integer, primary_key=True, autoincrement=True)
     email    = db.Column(db.String(255), nullable=False)
-    login_at = db.Column(db.DateTime, default=get_utc_now)
+    login_at = db.Column(db.DateTime, default=get_ist_now)
 
 class Scan(db.Model):
     __tablename__ = 'scans'
@@ -165,7 +149,7 @@ class Scan(db.Model):
     dentist_name    = db.Column(db.String(255), nullable=True)
     dentist_note    = db.Column(db.Text, nullable=True)
     review_status   = db.Column(db.String(15), default='Pending')  # Pending|Reviewed
-    created_at      = db.Column(db.DateTime, default=get_utc_now)
+    created_at      = db.Column(db.DateTime, default=get_ist_now)
 
 class PainAssessment(db.Model):
     __tablename__ = 'pain_assessments'
@@ -181,7 +165,7 @@ class PainAssessment(db.Model):
     score        = db.Column(db.Integer, default=0)               # 0-100
     severity     = db.Column(db.String(20), default='Mild')       # Mild|Moderate|Severe
     advice       = db.Column(db.Text, nullable=True)              # Groq advice
-    created_at   = db.Column(db.DateTime, default=get_utc_now)
+    created_at   = db.Column(db.DateTime, default=get_ist_now)
 
 class AnesthesiaPrediction(db.Model):
     __tablename__ = 'anesthesia_predictions'
@@ -198,7 +182,7 @@ class AnesthesiaPrediction(db.Model):
     risk_level         = db.Column(db.String(15), default='Low')  # Low|Moderate|High
     confidence         = db.Column(db.Float, default=0.0)
     result             = db.Column(db.Text, nullable=True)        # full Groq text
-    created_at         = db.Column(db.DateTime, default=get_utc_now)
+    created_at         = db.Column(db.DateTime, default=get_ist_now)
 
 class Appointment(db.Model):
     __tablename__ = 'appointments'
@@ -210,7 +194,7 @@ class Appointment(db.Model):
     date         = db.Column(db.String(30), nullable=False)
     time         = db.Column(db.String(20), nullable=False)
     status       = db.Column(db.String(15), default='Pending')   # Pending|Confirmed|Declined
-    created_at   = db.Column(db.DateTime, default=get_utc_now)
+    created_at   = db.Column(db.DateTime, default=get_ist_now)
 
 class Consultation(db.Model):
     __tablename__ = 'consultations'
@@ -221,7 +205,7 @@ class Consultation(db.Model):
     message      = db.Column(db.Text, nullable=False)
     reply        = db.Column(db.Text, nullable=True)
     status       = db.Column(db.String(15), default='Pending')   # Pending|Replied
-    created_at   = db.Column(db.DateTime, default=get_utc_now)
+    created_at   = db.Column(db.DateTime, default=get_ist_now)
 
 
 # ─────────────────────────────────────────
@@ -411,6 +395,15 @@ def change_password():
 @app.route('/scans', methods=['POST'])
 def add_scan():
     try:
+        safe_print("\n========== START AI ==========")
+        
+        # 1. Verify Groq API Key
+        groq_api_key_loaded = os.environ.get("GROQ_API_KEY")
+        if groq_api_key_loaded:
+            safe_print("Groq API key loaded: Yes (Length: " + str(len(groq_api_key_loaded)) + ")")
+        else:
+            safe_print("Groq API key loaded: No")
+            
         if 'image' not in request.files:
             return jsonify({'error': 'No image uploaded'}), 400
 
@@ -436,22 +429,18 @@ def add_scan():
         try:
             upload_result = cloudinary.uploader.upload(image, folder='dentalinsight')
             image_url = upload_result['secure_url']
-            print("Uploading image:", image_url)
+            safe_print(f"Cloudinary URL: {image_url}")
         except Exception as e:
-            print("Cloudinary upload fallback:", e)
+            safe_print("Cloudinary upload fallback:", e)
             image_url = f"data:{mime_type};base64,{base64_image}"
 
-        # ---------- REAL GROQ VISION AI ANALYSIS ----------
-        # qwen/qwen3.6-27b is the only model on this Groq API key that
-        # accepts multimodal image_url content. All other available models
-        # reject image_url with "messages[0].content must be a string".
-        # meta-llama/llama-4-scout-17b-16e-instruct does NOT exist on this key
-        # and causes a 404 crash.
-        VISION_MODEL = "qwen/qwen3.6-27b"
-
+        # 3. Correct Vision Model
+        VISION_MODEL = "llama-3.2-11b-vision-preview"
+        
+        patient_notes = form.get('notes', 'None provided')
         prompt = f"""You are examining a dental/oral photograph. Analyze it thoroughly.
 
-Patient's notes: {form.get('notes', 'None provided')}
+Patient's notes: {patient_notes}
 
 Provide your analysis in this exact structure:
 
@@ -470,98 +459,113 @@ Instructions:
 - Always provide your best analysis even if image quality is not perfect.
 - Be specific and clinical in your observations."""
 
-        safe_print(f"\n========== GROQ VISION REQUEST ==========")
-        safe_print(f"Model       : {VISION_MODEL}")
-        safe_print(f"Image MIME  : {mime_type}")
-        safe_print(f"Image bytes : {len(image_bytes)}")
-        safe_print(f"Patient notes: {form.get('notes', '')}")
-        safe_print(f"==========================================")
+        # 4 & 5. Sending request to Groq with complete payload logged
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": prompt
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": image_url
+                        }
+                    }
+                ]
+            }
+        ]
+        
+        safe_print("Sending request to Groq...")
+        safe_print(f"Payload Model: {VISION_MODEL}")
+        safe_print(f"Payload URL length: {len(image_url)}")
+        
+        if not client:
+            raise Exception("Groq client is None. API key might be missing.")
 
         try:
             response = client.chat.completions.create(
                 model=VISION_MODEL,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are a dental imaging AI specialist. Analyze the oral/dental image provided and give a detailed clinical assessment. Always provide your best professional analysis of visible dental features."
-                    },
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": prompt
-                            },
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:{mime_type};base64,{base64_image}"
-                                }
-                            }
-                        ]
-                    }
-                ]
+                messages=messages,
+                temperature=0.2,
+                max_tokens=1024
             )
         except Exception as groq_err:
             import traceback
             safe_print(f"\n========== GROQ API ERROR ==========")
-            safe_print(f"Error type : {type(groq_err).__name__}")
-            safe_print(f"Error msg  : {groq_err}")
+            safe_print(f"Error type: {type(groq_err).__name__}")
+            safe_print(f"Error msg: {str(groq_err)}")
             traceback.print_exc()
             safe_print(f"=====================================")
             return jsonify({'error': f'AI analysis failed: {str(groq_err)}'}), 500
 
-        # Guard: ensure choices exist before accessing
+        # 6. Print the COMPLETE Groq response
+        safe_print("\n========== RAW GROQ RESPONSE ==========")
+        try:
+            raw_response_json = response.model_dump_json(indent=2)
+            safe_print(raw_response_json)
+        except Exception as e:
+            safe_print(f"Could not print raw response JSON: {e}")
+        safe_print("==========================================")
+
+        # 8. Guard against empty response
         if not response.choices or not response.choices[0].message.content:
             safe_print("[ERROR] Groq returned empty choices — model may have refused the request.")
             return jsonify({'error': 'AI model returned an empty response. Please try again.'}), 500
 
         raw_analysis = sanitize_text(response.choices[0].message.content)
+        
+        if not raw_analysis.strip():
+            safe_print("[ERROR] Groq returned empty text content.")
+            return jsonify({'error': 'AI model returned an empty text content. Please try again.'}), 500
 
-        safe_print(f"\n========== RAW GROQ RESPONSE ==========")
-        safe_print(raw_analysis[:500])  # print first 500 chars to avoid log flood
-        safe_print(f"==========================================")
-
-        import re
-        # Strip <think>...</think> reasoning blocks if the model emits them
-        if '</think>' in raw_analysis:
-            analysis = raw_analysis.split('</think>')[-1].strip()
-        else:
-            analysis = re.sub(r'<think>.*?</think>', '', raw_analysis, flags=re.DOTALL | re.IGNORECASE).strip()
-
-        # If analysis is empty after stripping thinking tags, use raw text
-        if not analysis:
+        analysis = clean_thinking_text(raw_analysis)
+        if not analysis.strip():
             analysis = raw_analysis.strip()
-
         analysis = sanitize_text(analysis)
-
-        safe_print("\n========== REAL AI VISION RESULT ==========")
-        safe_print(analysis)
-        safe_print("============================================")
 
         severity = "Mild"
         condition = "Dental Condition Detected"
+        findings = []
+        recommendations = []
 
+        # Simple parsing for structured data
         for line in analysis.split('\n'):
             line_str = line.strip()
             if line_str.upper().startswith("CONDITION DETECTED:"):
-                cond_val = line_str.split(":", 1)[1].strip()
-                if cond_val:
-                    condition = sanitize_text(cond_val)
-            if line_str.upper().startswith("PAIN SEVERITY:") or line_str.upper().startswith("SEVERITY:"):
-                sev_val = line_str.split(":", 1)[1].strip()
-                if "SEVERE" in sev_val.upper():
+                condition = sanitize_text(line_str.split(":", 1)[1].strip())
+            elif line_str.upper().startswith("PAIN SEVERITY:") or line_str.upper().startswith("SEVERITY:"):
+                sev_val = line_str.split(":", 1)[1].strip().upper()
+                if "SEVERE" in sev_val:
                     severity = "Severe"
-                elif "MODERATE" in sev_val.upper():
+                elif "MODERATE" in sev_val:
                     severity = "Moderate"
-                elif "NONE" in sev_val.upper():
+                elif "NONE" in sev_val:
                     severity = "None"
                 else:
                     severity = "Mild"
+            elif line_str.upper().startswith("OBSERVATIONS:"):
+                findings.append(sanitize_text(line_str.split(":", 1)[1].strip()))
+            elif line_str.upper().startswith("RECOMMENDED TREATMENT:"):
+                recommendations.append(sanitize_text(line_str.split(":", 1)[1].strip()))
 
-        analysis = clean_thinking_text(analysis)
-        clean_summ = clean_thinking_text(analysis[:200] if analysis else '')
+        # Fallback if parsing failed
+        if not findings:
+            findings.append("See full analysis for details.")
+        if not recommendations:
+            recommendations.append("See full analysis for treatment recommendations.")
 
+        summary = analysis[:200] + "..." if len(analysis) > 200 else analysis
+
+        safe_print(f"Extracted analysis: {analysis[:100]}...")
+        safe_print(f"Summary: {summary[:50]}...")
+        safe_print(f"Findings: {findings}")
+        safe_print(f"Recommendations: {recommendations}")
+        
+        safe_print("Saving to database...")
+        
         new_scan = Scan(
             patient_id=int(patient_id),
             patient_name=patient_name,
@@ -569,11 +573,10 @@ Instructions:
             notes=sanitize_text(form.get('notes', '')),
             condition=condition,
             severity=severity,
-            findings='[]',
-            recommendations='[]',
+            findings=json.dumps(findings),
+            recommendations=json.dumps(recommendations),
             analysis=analysis,
-            summary=clean_summ,
-            created_at=get_utc_now()
+            summary=summary
         )
         db.session.add(new_scan)
         
@@ -581,13 +584,15 @@ Instructions:
         new_consult = Consultation(
             patient_id=int(patient_id),
             patient_name=patient_name,
-            message=f"AI Scan Analysis:\nSeverity: {severity}\n\nNotes: {form.get('notes', '')}\nAnalysis: {analysis}",
-            status='Pending',
-            created_at=get_utc_now()
+            message=f"AI Scan Analysis:\nSeverity: {severity}\n\nNotes: {patient_notes}\nAnalysis: {analysis}",
+            status='Pending'
         )
         db.session.add(new_consult)
         
         db.session.commit()
+        safe_print("Database save successful.")
+        safe_print("Returning JSON response.")
+        safe_print("========== END AI ==========\n")
 
         return jsonify({
             "message": "Scan saved",
@@ -597,10 +602,11 @@ Instructions:
 
     except Exception as e:
         db.session.rollback()
-
+        import traceback
         safe_print("\n========== ERROR ==========")
-        safe_print(type(e))
-        safe_print(str(e))
+        safe_print(f"Type: {type(e)}")
+        safe_print(f"Message: {str(e)}")
+        traceback.print_exc()
         safe_print("===========================\n")
         return jsonify({'error': str(e)}), 500
 
