@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dental Insight - Sign In</title>
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg-gradient: linear-gradient(135deg, #f4faf9 0%, #eaf5f3 50%, #f0f7f5 100%);
+      --teal-primary: #008b8b;
+      --teal-hover: #007575;
+      --teal-accent: #0f9d9a;
+      --text-dark: #123738;
+      --text-muted: #64748b;
+      --text-light: #475569;
+      --mint-light: #e6f6f4;
+      --mint-icon-bg: #e1f5f2;
+      --border-color: #e2e8f0;
+      --card-shadow: 0 20px 40px -15px rgba(0, 75, 75, 0.07), 0 0 25px rgba(0, 0, 0, 0.03);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+
+    body {
+      background: var(--bg-gradient);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      color: var(--text-dark);
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* Soft fluid background shapes */
+    body::before {
+      content: '';
+      position: absolute;
+      top: -10%;
+      right: -5%;
+      width: 550px;
+      height: 550px;
+      background: radial-gradient(circle, rgba(162, 230, 222, 0.25) 0%, rgba(255,255,255,0) 70%);
+      border-radius: 50%;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    body::after {
+      content: '';
+      position: absolute;
+      bottom: -10%;
+      left: -5%;
+      width: 450px;
+      height: 450px;
+      background: radial-gradient(circle, rgba(184, 236, 230, 0.25) 0%, rgba(255,255,255,0) 70%);
+      border-radius: 50%;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .main-container {
+      max-width: 1200px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3rem;
+      align-items: center;
+      flex: 1;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Left Hero / Branding Column */
+    .hero-column {
+      display: flex;
+      flex-direction: column;
+      gap: 1.75rem;
+      padding-right: 1rem;
+    }
+
+    .brand-header {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .brand-logo {
+      width: 52px;
+      height: 52px;
+      background: linear-gradient(135deg, #d3f3ee 0%, #b8ebe3 100%);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(0, 139, 139, 0.12);
+    }
+
+    .brand-logo svg {
+      width: 30px;
+      height: 30px;
+      fill: var(--teal-primary);
+    }
+
+    .brand-title-group h1 {
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: var(--text-dark);
+      letter-spacing: -0.02em;
+    }
+
+    .brand-title-group p {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .hero-headline {
+      font-size: 2.3rem;
+      font-weight: 800;
+      line-height: 1.25;
+      color: var(--text-dark);
+      letter-spacing: -0.03em;
+    }
+
+    .hero-headline span.accent {
+      color: var(--teal-accent);
+    }
+
+    .hero-subtext {
+      font-size: 0.95rem;
+      color: var(--text-light);
+      line-height: 1.5;
+    }
+
+    /* Graphic + Features Split */
+    .hero-content-split {
+      display: grid;
+      grid-template-columns: 1.1fr 1fr;
+      gap: 1.5rem;
+      align-items: center;
+      margin-top: 0.5rem;
+    }
+
+    /* 3D Tooth Illustration */
+    .graphic-container {
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .blob-bg {
+      position: absolute;
+      width: 240px;
+      height: 240px;
+      background: #c7ede7;
+      border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%;
+      animation: morphBlob 10s ease-in-out infinite alternate;
+      z-index: 0;
+      opacity: 0.7;
+    }
+
+    @keyframes morphBlob {
+      0% { border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%; }
+      100% { border-radius: 60% 40% 30% 70% / 50% 60% 40% 60%; }
+    }
+
+    .tooth-illustration {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 250px;
+      height: auto;
+      filter: drop-shadow(0 15px 25px rgba(0, 100, 100, 0.12));
+    }
+
+    /* Feature List */
+    .feature-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1.2rem;
+    }
+
+    .feature-item {
+      display: flex;
+      align-items: center;
+      gap: 0.9rem;
+    }
+
+    .feature-icon-badge {
+      width: 44px;
+      height: 44px;
+      background: var(--mint-icon-bg);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .feature-icon-badge svg {
+      width: 22px;
+      height: 22px;
+      stroke: var(--teal-primary);
+      stroke-width: 2;
+      fill: none;
+    }
+
+    .feature-text h4 {
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: var(--text-dark);
+    }
+
+    .feature-text p {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    /* Right Column - Login Card */
+    .login-card {
+      background: #ffffff;
+      border-radius: 24px;
+      padding: 2.75rem 2.5rem;
+      box-shadow: var(--card-shadow);
+      width: 100%;
+      max-width: 450px;
+      margin: 0 auto;
+      border: 1px solid rgba(226, 232, 240, 0.8);
+      position: relative;
+      z-index: 2;
+    }
+
+    .card-header {
+      text-align: center;
+      margin-bottom: 2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .lock-badge {
+      width: 56px;
+      height: 56px;
+      background: #e6f7f5;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1.25rem;
+    }
+
+    .lock-badge svg {
+      width: 24px;
+      height: 24px;
+      fill: var(--teal-primary);
+    }
+
+    .card-header h2 {
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: var(--text-dark);
+      margin-bottom: 0.35rem;
+      letter-spacing: -0.02em;
+    }
+
+    .card-header p {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+    }
+
+    /* Form Styles */
+    .form-group {
+      margin-bottom: 1.25rem;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-dark);
+      margin-bottom: 0.45rem;
+    }
+
+    .input-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .input-icon {
+      position: absolute;
+      left: 14px;
+      width: 18px;
+      height: 18px;
+      stroke: #94a3b8;
+      stroke-width: 2;
+      fill: none;
+      pointer-events: none;
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 0.75rem 1rem 0.75rem 2.6rem;
+      font-size: 0.9rem;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      outline: none;
+      transition: all 0.2s ease;
+      background-color: #fafcfc;
+      color: var(--text-dark);
+    }
+
+    .form-input:focus {
+      border-color: var(--teal-primary);
+      background-color: #ffffff;
+      box-shadow: 0 0 0 4px rgba(0, 139, 139, 0.1);
+    }
+
+    .toggle-password {
+      position: absolute;
+      right: 14px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 2px;
+      display: flex;
+      align-items: center;
+    }
+
+    .toggle-password svg {
+      width: 18px;
+      height: 18px;
+      stroke: #94a3b8;
+      stroke-width: 2;
+      fill: none;
+    }
+
+    .forgot-link-container {
+      text-align: right;
+      margin-top: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .forgot-link {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--teal-primary);
+      text-decoration: none;
+      transition: color 0.2s ease;
+    }
+
+    .forgot-link:hover {
+      color: var(--teal-hover);
+      text-decoration: underline;
+    }
+
+    .btn-submit {
+      width: 100%;
+      padding: 0.85rem;
+      background-color: var(--teal-primary);
+      color: #ffffff;
+      border: none;
+      border-radius: 12px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 12px rgba(0, 139, 139, 0.2);
+    }
+
+    .btn-submit:hover {
+      background-color: var(--teal-hover);
+      box-shadow: 0 6px 16px rgba(0, 139, 139, 0.3);
+      transform: translateY(-1px);
+    }
+
+    .btn-submit:active {
+      transform: translateY(0);
+    }
+
+    /* Alert Message */
+    .alert-banner {
+      padding: 0.75rem 1rem;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      margin-bottom: 1.25rem;
+      display: none;
+    }
+
+    .alert-danger {
+      background-color: #fef2f2;
+      color: #991b1b;
+      border: 1px solid #fecaca;
+    }
+
+    .alert-success {
+      background-color: #f0fdf4;
+      color: #166534;
+      border: 1px solid #bbf7d0;
+    }
+
+    /* Divider */
+    .divider {
+      display: flex;
+      align-items: center;
+      text-align: center;
+      margin: 1.5rem 0;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+    }
+
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .divider span {
+      padding: 0 0.75rem;
+    }
+
+    .signup-text {
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .signup-link {
+      font-weight: 700;
+      color: var(--teal-primary);
+      text-decoration: none;
+      margin-left: 0.25rem;
+    }
+
+    .signup-link:hover {
+      text-decoration: underline;
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      padding: 1.5rem;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Responsive */
+    @media (max-width: 992px) {
+      .main-container {
+        grid-template-columns: 1fr;
+        gap: 2.5rem;
+        padding-top: 1.5rem;
+      }
+      .hero-column {
+        padding-right: 0;
+        text-align: center;
+        align-items: center;
+      }
+      .brand-header {
+        justify-content: center;
+      }
+      .hero-content-split {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+      }
+      .feature-list {
+        align-items: center;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <main class="main-container">
+    
+    <!-- LEFT COLUMN: Hero & Branding -->
+    <section class="hero-column">
+      
+      <!-- Brand Logo Header -->
+      <div class="brand-header">
+        <div class="brand-logo" aria-label="Dental Insight Logo">
+          <!-- Tooth + Plus Icon -->
+          <svg viewBox="0 0 24 24">
+            <path d="M12 2C8.5 2 6 4.5 6 7.5C6 11 8 13.5 8.5 17C9 20.5 10 22 12 22C14 22 15 20.5 15.5 17C16 13.5 18 11 18 7.5C18 4.5 15.5 2 12 2Z" fill="currentColor"/>
+            <path d="M12 7V13M9 10H15" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="brand-title-group">
+          <h1>Dental Insight</h1>
+          <p>AI-powered oral health assessment</p>
+        </div>
+      </div>
+
+      <!-- Headline -->
+      <h2 class="hero-headline">
+        Smart oral health assessment, <span class="accent">anytime, anywhere.</span>
+      </h2>
+
+      <p class="hero-subtext">
+        Upload images, get AI-powered insights, track your dental health and stay ahead.
+      </p>
+
+      <!-- Content Split: 3D Graphic + Feature List -->
+      <div class="hero-content-split">
+        
+        <!-- Graphic -->
+        <div class="graphic-container">
+          <div class="blob-bg"></div>
+          <!-- SVG 3D-Style Tooth & Magnifying Glass Illustration -->
+          <svg class="tooth-illustration" viewBox="0 0 300 300" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <radialGradient id="toothGrad" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(130 90) scale(140)">
+                <stop offset="0%" stop-color="#ffffff"/>
+                <stop offset="70%" stop-color="#f0f9f8"/>
+                <stop offset="100%" stop-color="#d2ebd9"/>
+              </radialGradient>
+              <linearGradient id="lensGrad" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#e0f7f5" stop-opacity="0.8"/>
+                <stop offset="100%" stop-color="#008b8b" stop-opacity="0.2"/>
+              </linearGradient>
+              <linearGradient id="handleGrad" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#00a896"/>
+                <stop offset="100%" stop-color="#028090"/>
+              </linearGradient>
+              <filter id="shadow" x="-10%" y="-10%" width="130%" height="130%">
+                <feDropShadow dx="0" dy="12" stdDeviation="10" flood-color="#004b4b" flood-opacity="0.15"/>
+              </filter>
+            </defs>
+
+            <!-- Ground Shadow -->
+            <ellipse cx="140" cy="260" rx="90" ry="12" fill="#004b4b" fill-opacity="0.08"/>
+
+            <!-- Tooth Body -->
+            <path d="M140 50C90 50 65 80 65 130C65 180 90 205 100 240C108 265 125 265 135 235C138 226 142 226 145 235C155 265 172 265 180 240C190 205 215 180 215 130C215 80 190 50 140 50Z" 
+                  fill="url(#toothGrad)" filter="url(#shadow)" />
+
+            <!-- Tooth Highlights -->
+            <path d="M100 75C80 90 75 120 75 140" stroke="#ffffff" stroke-width="6" stroke-linecap="round" opacity="0.8"/>
+            <path d="M125 62C135 60 145 60 155 62" stroke="#ffffff" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
+
+            <!-- Sparkles -->
+            <path d="M210 65L213 75L223 78L213 81L210 91L207 81L197 78L207 75Z" fill="#70e4d7"/>
+            <path d="M80 45L82 52L89 54L82 56L80 63L78 56L71 54L78 52Z" fill="#70e4d7"/>
+            <path d="M235 155L237 160L242 162L237 164L235 169L233 164L228 162L233 160Z" fill="#70e4d7"/>
+
+            <!-- Magnifying Glass Overlay -->
+            <g filter="url(#shadow)">
+              <!-- Glass Lens Content / Zoom View -->
+              <circle cx="180" cy="150" r="45" fill="url(#lensGrad)" stroke="#ffffff" stroke-width="3"/>
+              <!-- Lens Ring -->
+              <circle cx="180" cy="150" r="45" stroke="#008b8b" stroke-width="7"/>
+              <!-- Handle -->
+              <path d="M212 182L255 225C259 229 259 235 255 239L249 245C245 249 239 249 235 245L192 202" 
+                    fill="url(#handleGrad)" stroke="#005f5f" stroke-width="2" stroke-linecap="round"/>
+              <!-- Lens Glare -->
+              <path d="M150 135C155 125 170 115 185 115" stroke="#ffffff" stroke-width="4" stroke-linecap="round" opacity="0.7"/>
+            </g>
+          </svg>
+        </div>
+
+        <!-- Features -->
+        <div class="feature-list">
+          
+          <div class="feature-item">
+            <div class="feature-icon-badge">
+              <!-- AI Brain Icon -->
+              <svg viewBox="0 0 24 24">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                <circle cx="9" cy="9" r="1.5"/><circle cx="15" cy="9" r="1.5"/><path d="M8 15s1.5 2 4 2 4-2 4-2"/>
+              </svg>
+            </div>
+            <div class="feature-text">
+              <h4>AI-Powered Analysis</h4>
+              <p>Advanced AI models for accurate assessment</p>
+            </div>
+          </div>
+
+          <div class="feature-item">
+            <div class="feature-icon-badge">
+              <!-- Shield Check Icon -->
+              <svg viewBox="0 0 24 24">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                <path d="M9 12l2 2 4-4"/>
+              </svg>
+            </div>
+            <div class="feature-text">
+              <h4>Secure & Private</h4>
+              <p>Your data is encrypted and protected</p>
+            </div>
+          </div>
+
+          <div class="feature-item">
+            <div class="feature-icon-badge">
+              <!-- Chart Line Icon -->
+              <svg viewBox="0 0 24 24">
+                <path d="M3 3v18h18"/>
+                <path d="M18.5 8.5L13.5 13.5L9.5 9.5L3.5 15.5"/>
+              </svg>
+            </div>
+            <div class="feature-text">
+              <h4>Track Progress</h4>
+              <p>Monitor your oral health over time</p>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <!-- RIGHT COLUMN: Login Card -->
+    <section class="card-column">
+      
+      <div class="login-card">
+        
+        <!-- Header -->
+        <div class="card-header">
+          <div class="lock-badge">
+            <svg viewBox="0 0 24 24">
+              <rect x="5" y="11" width="14" height="10" rx="2" fill="currentColor"/>
+              <path d="M8 11V7a4 4 0 118 0v4" stroke="currentColor" stroke-width="2" fill="none"/>
+            </svg>
+          </div>
+          <h2>Welcome Back</h2>
+          <p>Sign in to continue to your account</p>
+        </div>
+
+        <!-- Alert Notification -->
+        <div id="alertMessage" class="alert-banner alert-danger"></div>
+
+        <!-- Form -->
+        <form id="loginForm" onsubmit="handleLogin(event)">
+          
+          <!-- Email Address -->
+          <div class="form-group">
+            <label class="form-label" for="emailInput">Email address</label>
+            <div class="input-wrapper">
+              <svg class="input-icon" viewBox="0 0 24 24">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                <path d="M22 6l-10 7L2 6"/>
+              </svg>
+              <input type="email" id="emailInput" class="form-input" placeholder="Enter your email" required />
+            </div>
+          </div>
+
+          <!-- Password -->
+          <div class="form-group">
+            <label class="form-label" for="passwordInput">Password</label>
+            <div class="input-wrapper">
+              <svg class="input-icon" viewBox="0 0 24 24">
+                <rect x="5" y="11" width="14" height="10" rx="2"/>
+                <path d="M8 11V7a4 4 0 118 0v4"/>
+              </svg>
+              <input type="password" id="passwordInput" class="form-input" placeholder="Enter your password" required />
+              <button type="button" class="toggle-password" id="togglePasswordBtn" onclick="togglePasswordVisibility()" aria-label="Toggle password visibility">
+                <svg id="eyeIcon" viewBox="0 0 24 24">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Forgot Password -->
+          <div class="forgot-link-container">
+            <a href="#" class="forgot-link" onclick="handleForgotPassword(event)">Forgot Password?</a>
+          </div>
+
+          <!-- Submit Button -->
+          <button type="submit" class="btn-submit" id="submitBtn">Log In</button>
+
+        </form>
+
+        <!-- Divider -->
+        <div class="divider">
+          <span>or</span>
+        </div>
+
+        <!-- Footer link -->
+        <div class="signup-text">
+          Don't have an account? <a href="#" class="signup-link" onclick="alert('Signup flow redirected to registration!')">Sign Up</a>
+        </div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- Page Footer -->
+  <footer>
+    &copy; 2025 Dental Insight. All rights reserved.
+  </footer>
+
+  <!-- Form Interactivity & Flask API Submission -->
+  <script>
+    function togglePasswordVisibility() {
+      const passwordInput = document.getElementById('passwordInput');
+      const eyeIcon = document.getElementById('eyeIcon');
+      
+      if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        eyeIcon.innerHTML = `
+          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+          <line x1="1" y1="1" x2="23" y2="23" stroke="#94a3b8" stroke-width="2"/>
+        `;
+      } else {
+        passwordInput.type = 'password';
+        eyeIcon.innerHTML = `
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+          <circle cx="12" cy="12" r="3"/>
+        `;
+      }
+    }
+
+    async function handleLogin(event) {
+      event.preventDefault();
+      
+      const email = document.getElementById('emailInput').value.trim();
+      const password = document.getElementById('passwordInput').value;
+      const alertBox = document.getElementById('alertMessage');
+      const submitBtn = document.getElementById('submitBtn');
+
+      alertBox.style.display = 'none';
+      submitBtn.disabled = true;
+      submitBtn.innerText = 'Logging in...';
+
+      try {
+        const response = await fetch('/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ email: email, password: password })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          alertBox.className = 'alert-banner alert-success';
+          alertBox.innerText = `Welcome back, ${data.user.name}! Redirecting...`;
+          alertBox.style.display = 'block';
+
+          // Store logged-in user in localStorage
+          localStorage.setItem('user', JSON.stringify(data.user));
+
+          setTimeout(() => {
+            if (data.user.role === 'dentist') {
+              window.location.href = '/login-page';
+            } else {
+              window.location.href = '/login-page';
+            }
+          }, 1500);
+        } else {
+          alertBox.className = 'alert-banner alert-danger';
+          alertBox.innerText = data.error || 'Invalid credentials. Please try again.';
+          alertBox.style.display = 'block';
+        }
+      } catch (err) {
+        alertBox.className = 'alert-banner alert-danger';
+        alertBox.innerText = 'Server error. Please check backend connection.';
+        alertBox.style.display = 'block';
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerText = 'Log In';
+      }
+    }
+
+    function handleForgotPassword(event) {
+      event.preventDefault();
+      const email = prompt('Enter your registered email address to reset password:');
+      if (!email) return;
+
+      const newPassword = prompt('Enter your new password (minimum 6 characters):');
+      if (!newPassword) return;
+
+      fetch('/reset_password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email, new_password: newPassword })
+      })
+      .then(res => res.json())
+      .then(data => {
+        alert(data.message || data.error);
+      })
+      .catch(() => alert('Failed to connect to backend server.'));
+    }
+  </script>
+</body>
+</html>

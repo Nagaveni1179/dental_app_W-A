@@ -2090,7 +2090,7 @@ class TestPerformanceLoad:
         errors = []
         def do_get():
             try:
-                get(client, "/appointments")
+                get(_MockClient(), "/appointments")
             except Exception:
                 pass  # threading with Flask test client may raise ContextVar errors
         threads = [threading.Thread(target=do_get) for _ in range(10)]

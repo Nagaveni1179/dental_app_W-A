@@ -1,15 +1,64 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+import zoneinfo
 import os
 import json
+import re
 import pymysql
 from groq import Groq
 import sys
 import io
+
+# Define IST timezone (+05:30) for reliable local timestamp handling
+IST = timezone(timedelta(hours=5, minutes=30))
+
+def get_utc_now():
+    """Returns timezone-aware UTC datetime for database storage."""
+    return datetime.now(timezone.utc)
+
+def format_local_dt(dt):
+    """
+    Converts UTC datetime object or ISO string into Asia/Kolkata (IST)
+    formatted string: 'dd MMM yyyy, hh:mm a' (e.g. '06 Aug 2026, 10:45 AM').
+    """
+    if not dt:
+        return ""
+    if isinstance(dt, str):
+        try:
+            dt = datetime.fromisoformat(dt)
+        except Exception:
+            return dt
+
+    # If datetime object has no tzinfo, treat as UTC stored in DB
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+
+    try:
+        ist = zoneinfo.ZoneInfo("Asia/Kolkata")
+    except Exception:
+        ist = IST
+
+    ist_dt = dt.astimezone(ist)
+    return ist_dt.strftime('%d %b %Y, %I:%M %p')
+
+def clean_thinking_text(text):
+    """Removes raw model thinking blocks <think>...</think> from response text."""
+    if not text:
+        return ""
+    if not isinstance(text, str):
+        text = str(text)
+    # Strip </think> trailing block
+    if '</think>' in text:
+        text = text.split('</think>')[-1].strip()
+    # Strip <think>...</think> blocks
+    text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL | re.IGNORECASE).strip()
+    # Also strip any unclosed <think>... blocks if model output was truncated
+    text = re.sub(r'<think>.*$', '', text, flags=re.DOTALL | re.IGNORECASE).strip()
+    return text
 
 # Force UTF-8 output streams on Windows to prevent 'charmap' codec errors when printing emojis/Unicode
 if hasattr(sys.stdout, 'reconfigure'):
@@ -47,6 +96,14 @@ import cloudinary.uploader
 app = Flask(__name__)
 CORS(app)
 
+@app.template_filter('format_local_dt')
+def jinja_format_local_dt(dt):
+    return format_local_dt(dt)
+
+@app.template_filter('clean_thinking')
+def jinja_clean_thinking(text):
+    return clean_thinking_text(text)
+
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
     "DATABASE_URL",
     "mysql+pymysql://root:@localhost/dentalinsight?charset=utf8mb4"
@@ -64,9 +121,8 @@ cloudinary.config(
     api_secret=os.environ.get('CLOUDINARY_API_SECRET', ''),
 )
 
-client = Groq(
-    api_key=os.environ.get("GROQ_API_KEY")
-)
+groq_api_key = os.environ.get("GROQ_API_KEY")
+client = Groq(api_key=groq_api_key) if groq_api_key else None
 
 db = SQLAlchemy(app)
 # ─────────────────────────────────────────
@@ -84,13 +140,13 @@ class User(db.Model):
     age            = db.Column(db.Integer, default=0)
     gender         = db.Column(db.String(10), nullable=True)
     specialization = db.Column(db.String(150), nullable=True)     # dentists only
-    created_at     = db.Column(db.DateTime, default=datetime.now)
+    created_at     = db.Column(db.DateTime, default=get_utc_now)
 
 class ActiveSession(db.Model):
     __tablename__ = 'active_sessions'
     id       = db.Column(db.Integer, primary_key=True, autoincrement=True)
     email    = db.Column(db.String(255), nullable=False)
-    login_at = db.Column(db.DateTime, default=datetime.now)
+    login_at = db.Column(db.DateTime, default=get_utc_now)
 
 class Scan(db.Model):
     __tablename__ = 'scans'
@@ -109,7 +165,7 @@ class Scan(db.Model):
     dentist_name    = db.Column(db.String(255), nullable=True)
     dentist_note    = db.Column(db.Text, nullable=True)
     review_status   = db.Column(db.String(15), default='Pending')  # Pending|Reviewed
-    created_at      = db.Column(db.DateTime, default=datetime.now)
+    created_at      = db.Column(db.DateTime, default=get_utc_now)
 
 class PainAssessment(db.Model):
     __tablename__ = 'pain_assessments'
@@ -125,7 +181,7 @@ class PainAssessment(db.Model):
     score        = db.Column(db.Integer, default=0)               # 0-100
     severity     = db.Column(db.String(20), default='Mild')       # Mild|Moderate|Severe
     advice       = db.Column(db.Text, nullable=True)              # Groq advice
-    created_at   = db.Column(db.DateTime, default=datetime.now)
+    created_at   = db.Column(db.DateTime, default=get_utc_now)
 
 class AnesthesiaPrediction(db.Model):
     __tablename__ = 'anesthesia_predictions'
@@ -142,7 +198,7 @@ class AnesthesiaPrediction(db.Model):
     risk_level         = db.Column(db.String(15), default='Low')  # Low|Moderate|High
     confidence         = db.Column(db.Float, default=0.0)
     result             = db.Column(db.Text, nullable=True)        # full Groq text
-    created_at         = db.Column(db.DateTime, default=datetime.now)
+    created_at         = db.Column(db.DateTime, default=get_utc_now)
 
 class Appointment(db.Model):
     __tablename__ = 'appointments'
@@ -154,7 +210,7 @@ class Appointment(db.Model):
     date         = db.Column(db.String(30), nullable=False)
     time         = db.Column(db.String(20), nullable=False)
     status       = db.Column(db.String(15), default='Pending')   # Pending|Confirmed|Declined
-    created_at   = db.Column(db.DateTime, default=datetime.now)
+    created_at   = db.Column(db.DateTime, default=get_utc_now)
 
 class Consultation(db.Model):
     __tablename__ = 'consultations'
@@ -165,7 +221,7 @@ class Consultation(db.Model):
     message      = db.Column(db.Text, nullable=False)
     reply        = db.Column(db.Text, nullable=True)
     status       = db.Column(db.String(15), default='Pending')   # Pending|Replied
-    created_at   = db.Column(db.DateTime, default=datetime.now)
+    created_at   = db.Column(db.DateTime, default=get_utc_now)
 
 
 # ─────────────────────────────────────────
@@ -180,6 +236,8 @@ def user_to_json(u):
     }
 
 def scan_to_json(s):
+    clean_analysis = clean_thinking_text(s.analysis or '')
+    clean_summary = clean_thinking_text(s.summary or (clean_analysis[:200] if clean_analysis else ''))
     return {
         'id': s.id,
         'patient_id': s.patient_id,
@@ -190,12 +248,12 @@ def scan_to_json(s):
         'severity': s.severity or 'Mild',
         'findings': json.loads(s.findings) if s.findings else [],
         'recommendations': json.loads(s.recommendations) if s.recommendations else [],
-        'analysis': s.analysis or '',
-        'summary': s.summary or '',
+        'analysis': clean_analysis,
+        'summary': clean_summary,
         'dentist_name': s.dentist_name,
         'dentist_note': s.dentist_note,
         'review_status': s.review_status,
-        'created_at': s.created_at.strftime('%d %b %Y, %I:%M %p') if s.created_at else None,
+        'created_at': format_local_dt(s.created_at),
     }
 
 def pain_to_json(p):
@@ -211,8 +269,8 @@ def pain_to_json(p):
         'bleeding': p.bleeding,
         'score': p.score,
         'severity': p.severity,
-        'advice': p.advice or '',
-        'created_at': p.created_at.strftime('%d %b %Y, %I:%M %p') if p.created_at else None,
+        'advice': clean_thinking_text(p.advice or ''),
+        'created_at': format_local_dt(p.created_at),
     }
 
 def anesthesia_to_json(a):
@@ -229,8 +287,8 @@ def anesthesia_to_json(a):
         'medications': a.medications or '',
         'risk_level': a.risk_level,
         'confidence': float(a.confidence),
-        'result': a.result or '',
-        'created_at': a.created_at.strftime('%d %b %Y, %I:%M %p') if a.created_at else None,
+        'result': clean_thinking_text(a.result or ''),
+        'created_at': format_local_dt(a.created_at),
     }
 
 def appointment_to_json(a):
@@ -243,7 +301,7 @@ def appointment_to_json(a):
         'date': a.date,
         'time': a.time,
         'status': a.status,
-        'created_at': a.created_at.strftime('%d %b %Y, %I:%M %p') if a.created_at else None,
+        'created_at': format_local_dt(a.created_at),
     }
 
 def consultation_to_json(c):
@@ -253,9 +311,9 @@ def consultation_to_json(c):
         'patient_name': c.patient_name,
         'dentist_id': c.dentist_id,
         'message': c.message,
-        'reply': c.reply or '',
+        'reply': clean_thinking_text(c.reply or ''),
         'status': c.status,
-        'created_at': c.created_at.strftime('%d %b %Y, %I:%M %p') if c.created_at else None,
+        'created_at': format_local_dt(c.created_at),
     }
 
 
@@ -501,6 +559,9 @@ Instructions:
                 else:
                     severity = "Mild"
 
+        analysis = clean_thinking_text(analysis)
+        clean_summ = clean_thinking_text(analysis[:200] if analysis else '')
+
         new_scan = Scan(
             patient_id=int(patient_id),
             patient_name=patient_name,
@@ -511,7 +572,8 @@ Instructions:
             findings='[]',
             recommendations='[]',
             analysis=analysis,
-            summary=analysis[:200]
+            summary=clean_summ,
+            created_at=get_utc_now()
         )
         db.session.add(new_scan)
         
@@ -520,7 +582,8 @@ Instructions:
             patient_id=int(patient_id),
             patient_name=patient_name,
             message=f"AI Scan Analysis:\nSeverity: {severity}\n\nNotes: {form.get('notes', '')}\nAnalysis: {analysis}",
-            status='Pending'
+            status='Pending',
+            created_at=get_utc_now()
         )
         db.session.add(new_consult)
         
@@ -645,7 +708,7 @@ Keep the answer under 120 words.
             ]
         )
 
-        advice = sanitize_text(response.choices[0].message.content)
+        advice = clean_thinking_text(sanitize_text(response.choices[0].message.content))
 
         pain = PainAssessment(
             patient_id=int(data['patient_id']),
@@ -729,7 +792,7 @@ RECOMMENDATIONS FOR DENTIST:
             ]
         )
 
-        result = sanitize_text(response.choices[0].message.content)
+        result = clean_thinking_text(sanitize_text(response.choices[0].message.content))
 
         if "High" in result:
             risk = "High"
@@ -1061,7 +1124,11 @@ def get_dashboard(user_id):
 
 @app.route('/', methods=['GET'])
 def health():
-    return jsonify({'status': 'Dental Insight API running'}), 200
+    return render_template('login.html')
+
+@app.route('/login-page', methods=['GET'])
+def login_page():
+    return render_template('login.html')
 
 @app.route('/reset_password', methods=['POST'])
 def reset_password():
