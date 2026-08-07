@@ -5,7 +5,11 @@ PyMySQL
 cloudinary
 Werkzeug
 gunicorn
-groq
 python-dotenv
 SQLAlchemy
 psycopg2-binary
+
+numpy
+Pillow
+tensorflow
+opencv-python-headless
