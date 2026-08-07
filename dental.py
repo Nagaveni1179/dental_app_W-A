@@ -1,7 +1,6 @@
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
-from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timezone
 import zoneinfo
@@ -9,9 +8,16 @@ import os
 import json
 import re
 import pymysql
-from groq import Groq
 import sys
 import io
+import base64
+import numpy as np
+from PIL import Image
+import tensorflow as tf
+from tensorflow.keras.models import load_model
+from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
+import cloudinary
+import cloudinary.uploader
 
 def get_ist_now():
     """Returns current datetime in Asia/Kolkata (IST) timezone without tzinfo for MySQL compatibility."""
@@ -19,17 +25,13 @@ def get_ist_now():
         ist = zoneinfo.ZoneInfo("Asia/Kolkata")
         return datetime.now(ist).replace(tzinfo=None)
     except Exception:
-        # Fallback if zoneinfo tz database is missing on system
         return datetime.now()
 
 def format_local_dt(dt):
     """Formats datetime object into user-friendly IST local string."""
     if not dt:
         return None
-    # If naive datetime from DB, treat as IST local time
     return dt.strftime('%d %b %Y, %I:%M %p')
-
-
 
 # Force UTF-8 output streams on Windows to prevent 'charmap' codec errors when printing emojis/Unicode
 if hasattr(sys.stdout, 'reconfigure'):
@@ -38,8 +40,6 @@ if hasattr(sys.stdout, 'reconfigure'):
 else:
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
-
-import re
 
 def sanitize_text(text):
     """Ensure text is valid UTF-8 and safely encodeable without surrogate/charmap errors."""
@@ -51,7 +51,6 @@ def sanitize_text(text):
 
     return text.encode("utf-8", errors="replace").decode("utf-8")
 
-
 def clean_thinking_text(text):
     """Remove <think>...</think> reasoning and return only the final answer."""
     if not text:
@@ -60,14 +59,13 @@ def clean_thinking_text(text):
     if not isinstance(text, str):
         text = str(text)
 
-    # Remove everything between <think> and </think>
     text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
 
-    # If there is no closing </think>, remove everything before the last </think>-style block
     if "</think>" in text:
         text = text.split("</think>", 1)[1]
 
     return text.strip()
+
 def safe_print(*args, **kwargs):
     """Safely print text to standard output on Windows systems."""
     try:
@@ -81,12 +79,322 @@ def safe_print(*args, **kwargs):
 
 pymysql.install_as_MySQLdb()
 
-# ── Cloudinary (oral image storage) ──
-import cloudinary
-import cloudinary.uploader
-
 app = Flask(__name__)
 CORS(app)
+
+# ============================
+# Load TensorFlow AI Model
+# ============================
+MODEL_PATH = "dental_model.h5"
+CLASS_NAMES_PATH = "class_names.json"
+
+try:
+    model = load_model(MODEL_PATH)
+
+    with open(CLASS_NAMES_PATH, "r") as f:
+        class_names = json.load(f)
+
+    safe_print("✅ TensorFlow model loaded successfully!")
+    safe_print("Classes:", class_names)
+
+except Exception as e:
+    safe_print("❌ Error loading TensorFlow model:", e)
+    model = None
+    class_names = ["Calculus", "Data caries", "Gingivitis", "Hypodontia", "Mouth Ulcer", "Tooth Discoloration"]
+
+DISEASE_INFO = {
+    "Calculus": {
+        "description": "Calculus (tartar) is hardened dental plaque that forms on teeth over time. If untreated, it can lead to gum disease and tooth loss.",
+        "symptoms": [
+            "Bleeding gums",
+            "Bad breath",
+            "Swollen gums",
+            "Rough deposits on teeth"
+        ],
+        "causes": [
+            "Poor oral hygiene",
+            "Plaque buildup",
+            "Smoking",
+            "Sugary diet"
+        ],
+        "treatment": [
+            "Professional dental scaling",
+            "Regular brushing",
+            "Daily flossing",
+            "Antibacterial mouthwash"
+        ],
+        "prevention": [
+            "Brush twice daily",
+            "Visit dentist every 6 months",
+            "Reduce sugary foods",
+            "Maintain oral hygiene"
+        ]
+    },
+    "Data caries": {
+        "description": "Dental caries (tooth decay) is caused by bacteria that damage the tooth enamel.",
+        "symptoms": [
+            "Tooth pain",
+            "Sensitivity",
+            "Visible holes",
+            "Dark spots"
+        ],
+        "causes": [
+            "Sugar",
+            "Poor brushing",
+            "Plaque bacteria"
+        ],
+        "treatment": [
+            "Dental filling",
+            "Root canal if severe",
+            "Fluoride treatment"
+        ],
+        "prevention": [
+            "Brush regularly",
+            "Avoid sugary foods",
+            "Dental checkups"
+        ]
+    },
+    "Gingivitis": {
+        "description": "Gingivitis is inflammation of the gums caused by plaque buildup.",
+        "symptoms": [
+            "Red gums",
+            "Bleeding while brushing",
+            "Swollen gums"
+        ],
+        "causes": [
+            "Plaque",
+            "Poor oral hygiene"
+        ],
+        "treatment": [
+            "Professional cleaning",
+            "Improve brushing",
+            "Daily flossing"
+        ],
+        "prevention": [
+            "Brush twice daily",
+            "Routine dental visits"
+        ]
+    },
+    "Hypodontia": {
+        "description": "Hypodontia is a condition where one or more teeth fail to develop naturally.",
+        "symptoms": [
+            "Missing teeth",
+            "Spacing"
+        ],
+        "causes": [
+            "Genetics"
+        ],
+        "treatment": [
+            "Dental implants",
+            "Braces",
+            "Dental bridge"
+        ],
+        "prevention": [
+            "Early dental consultation"
+        ]
+    },
+    "Mouth Ulcer": {
+        "description": "A mouth ulcer is a painful sore inside the mouth.",
+        "symptoms": [
+            "Pain",
+            "White ulcer",
+            "Difficulty eating"
+        ],
+        "causes": [
+            "Stress",
+            "Vitamin deficiency",
+            "Injury"
+        ],
+        "treatment": [
+            "Ulcer gel",
+            "Pain relief",
+            "Vitamin supplements"
+        ],
+        "prevention": [
+            "Balanced diet",
+            "Good oral hygiene"
+        ]
+    },
+    "Tooth Discoloration": {
+        "description": "Tooth discoloration refers to changes in the natural color of teeth.",
+        "symptoms": [
+            "Yellow teeth",
+            "Brown stains",
+            "White spots"
+        ],
+        "causes": [
+            "Coffee",
+            "Tea",
+            "Smoking",
+            "Poor brushing"
+        ],
+        "treatment": [
+            "Teeth whitening",
+            "Professional cleaning"
+        ],
+        "prevention": [
+            "Brush twice daily",
+            "Limit staining drinks"
+        ]
+    }
+}
+
+def predict_dental_image(image_bytes):
+    """Classifies a dental image using local TensorFlow model and class_names.json."""
+    if model is None:
+        raise Exception("TensorFlow model is not loaded.")
+
+    img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    img_resized = img.resize((224, 224))
+
+    img_array = np.array(img_resized, dtype=np.float32)
+    img_array = preprocess_input(img_array)
+    img_array = np.expand_dims(img_array, axis=0)
+
+    predictions = model.predict(img_array)
+    predicted_index = int(np.argmax(predictions[0]))
+    confidence = float(np.max(predictions[0]))
+
+    if class_names and predicted_index < len(class_names):
+        condition = class_names[predicted_index]
+    else:
+        condition = "Dental Condition Detected"
+
+    conf_pct = confidence * 100.0
+
+    if condition == "Calculus":
+        severity = "Moderate"
+        findings = [
+            "Visible hardened dental plaque/tartar buildup along the gumline.",
+            "Signs of localized gingival irritation."
+        ]
+        recommendations = [
+            "Schedule a professional dental scaling and cleaning (prophylaxis).",
+            "Maintain daily flossing and anti-plaque mouthwash routine."
+        ]
+        summary = f"Calculus detected with {conf_pct:.1f}% confidence. Hardened plaque deposits along teeth margins."
+    elif condition == "Data caries":
+        severity = "Severe" if confidence > 0.8 else "Moderate"
+        findings = [
+            "Localized tooth decay / cavity lesion detected on enamel surface.",
+            "Demineralization of enamel/dentin layer observed."
+        ]
+        recommendations = [
+            "Consult a dentist promptly for restorative treatment (filling/crown).",
+            "Maintain good oral hygiene and limit sugary foods/drinks."
+        ]
+        summary = f"Data caries (Tooth decay) detected with {conf_pct:.1f}% confidence. Cavity lesion visible."
+    elif condition == "Gingivitis":
+        severity = "Moderate"
+        findings = [
+            "Erythematous, swollen, or inflamed gum tissue.",
+            "Signs of early periodontal inflammation."
+        ]
+        recommendations = [
+            "Improve daily oral hygiene using a soft-bristled toothbrush.",
+            "Use warm salt water or chlorhexidine mouthwash."
+        ]
+        summary = f"Gingivitis detected with {conf_pct:.1f}% confidence. Inflammation of the gum tissue identified."
+    elif condition == "Hypodontia":
+        severity = "Mild"
+        findings = [
+            "Congenitally missing tooth or empty socket space observed.",
+            "Alveolar space alteration present."
+        ]
+        recommendations = [
+            "Consult an orthodontist or prosthodontist for replacement options.",
+            "Evaluate options such as implants, bridges, or space closure."
+        ]
+        summary = f"Hypodontia detected with {conf_pct:.1f}% confidence. Missing tooth space observed."
+    elif condition == "Mouth Ulcer":
+        severity = "Moderate"
+        findings = [
+            "Localized oral mucosal ulceration/lesion present.",
+            "Erythematous border surrounding central mucosal defect."
+        ]
+        recommendations = [
+            "Apply topical oral anesthetic gel or protective paste.",
+            "Avoid spicy, acidic, or hard foods until healed."
+        ]
+        summary = f"Mouth Ulcer detected with {conf_pct:.1f}% confidence. Oral mucosal lesion identified."
+    elif condition == "Tooth Discoloration":
+        severity = "Mild"
+        findings = [
+            "Surface staining or enamel shade alteration.",
+            "Extrinsic/intrinsic tooth color variations visible."
+        ]
+        recommendations = [
+            "Schedule professional dental prophylaxis polishing or whitening.",
+            "Reduce consumption of staining items like coffee, tea, or tobacco."
+        ]
+        summary = f"Tooth Discoloration detected with {conf_pct:.1f}% confidence. Enamel staining noted."
+    else:
+        severity = "Mild"
+        findings = [f"Visual features matching {condition} detected."]
+        recommendations = ["Consult a dental professional for detailed examination."]
+        summary = f"{condition} detected with {conf_pct:.1f}% confidence."
+
+    info = DISEASE_INFO.get(condition, {})
+
+    symptoms_list = info.get("symptoms", [])
+    causes_list = info.get("causes", [])
+    treatment_list = info.get("treatment", recommendations)
+    prevention_list = info.get("prevention", [])
+
+    symptoms_str = '\n• '.join(symptoms_list) if symptoms_list else "None listed"
+    causes_str = '\n• '.join(causes_list) if causes_list else "None listed"
+    findings_str = '\n• '.join(findings) if findings else "None listed"
+    recommendations_str = '\n• '.join(treatment_list) if treatment_list else "None listed"
+    prevention_str = '\n• '.join(prevention_list) if prevention_list else "None listed"
+
+    analysis = f"""
+🦷 AI DENTAL HEALTH REPORT
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CONDITION DETECTED
+{condition}
+
+CONFIDENCE SCORE
+{conf_pct:.1f}%
+
+SEVERITY
+{severity}
+
+DESCRIPTION
+{info.get("description", "Not available")}
+
+POSSIBLE SYMPTOMS
+• {symptoms_str}
+
+POSSIBLE CAUSES
+• {causes_str}
+
+OBSERVATIONS
+• {findings_str}
+
+RECOMMENDED TREATMENT
+• {recommendations_str}
+
+PREVENTION TIPS
+• {prevention_str}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+DISCLAIMER
+
+This AI analysis is intended for educational and preliminary screening purposes only. It should not be considered a final diagnosis. Please consult a qualified dentist for confirmation and treatment.
+""".strip()
+
+    return {
+        "condition": condition,
+        "confidence": confidence,
+        "severity": severity,
+        "findings": findings,
+        "recommendations": recommendations,
+        "summary": summary,
+        "analysis": analysis
+    }
 
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
     "DATABASE_URL",
@@ -105,10 +413,8 @@ cloudinary.config(
     api_secret=os.environ.get('CLOUDINARY_API_SECRET', ''),
 )
 
-groq_api_key = os.environ.get("GROQ_API_KEY")
-client = Groq(api_key=groq_api_key) if groq_api_key else None
-
 db = SQLAlchemy(app)
+
 # ─────────────────────────────────────────
 # MODELS
 # ─────────────────────────────────────────
@@ -143,7 +449,7 @@ class Scan(db.Model):
     severity        = db.Column(db.String(20), default='Mild')    # Mild|Moderate|Severe
     findings        = db.Column(db.Text, nullable=True)           # JSON array
     recommendations = db.Column(db.Text, nullable=True)           # JSON array
-    analysis        = db.Column(db.Text, nullable=True)           # full Groq text
+    analysis        = db.Column(db.Text, nullable=True)           # full analysis text
     summary         = db.Column(db.Text, nullable=True)
     dentist_id      = db.Column(db.Integer, nullable=True)
     dentist_name    = db.Column(db.String(255), nullable=True)
@@ -164,7 +470,7 @@ class PainAssessment(db.Model):
     bleeding     = db.Column(db.Boolean, default=False)
     score        = db.Column(db.Integer, default=0)               # 0-100
     severity     = db.Column(db.String(20), default='Mild')       # Mild|Moderate|Severe
-    advice       = db.Column(db.Text, nullable=True)              # Groq advice
+    advice       = db.Column(db.Text, nullable=True)              # clinical advice
     created_at   = db.Column(db.DateTime, default=get_ist_now)
 
 class AnesthesiaPrediction(db.Model):
@@ -181,7 +487,7 @@ class AnesthesiaPrediction(db.Model):
     medications        = db.Column(db.Text, nullable=True)
     risk_level         = db.Column(db.String(15), default='Low')  # Low|Moderate|High
     confidence         = db.Column(db.Float, default=0.0)
-    result             = db.Column(db.Text, nullable=True)        # full Groq text
+    result             = db.Column(db.Text, nullable=True)        # full prediction text
     created_at         = db.Column(db.DateTime, default=get_ist_now)
 
 class Appointment(db.Model):
@@ -206,7 +512,6 @@ class Consultation(db.Model):
     reply        = db.Column(db.Text, nullable=True)
     status       = db.Column(db.String(15), default='Pending')   # Pending|Replied
     created_at   = db.Column(db.DateTime, default=get_ist_now)
-
 
 # ─────────────────────────────────────────
 # JSON HELPERS
@@ -300,7 +605,6 @@ def consultation_to_json(c):
         'created_at': format_local_dt(c.created_at),
     }
 
-
 # ─────────────────────────────────────────
 # AUTH
 # ─────────────────────────────────────────
@@ -312,7 +616,6 @@ def signup():
         required = ['name', 'email', 'password', 'role']
         if not data or not all(k in data for k in required):
             return jsonify({'error': 'Missing required fields'}), 400
-        # Admin accounts are not self-registered.
         if data['role'] not in ('patient', 'dentist'):
             return jsonify({'error': 'Invalid role'}), 400
         if User.query.filter_by(email=data['email']).first():
@@ -384,26 +687,15 @@ def change_password():
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
-
 # ─────────────────────────────────────────
 # SCANS (oral image analysis)
 # ─────────────────────────────────────────
 
-# Receives the image FILE + the result the app already computed with Groq
-# (Groq runs in the frontend, not here). Uploads the image to Cloudinary
-# and saves the row.
 @app.route('/scans', methods=['POST'])
 def add_scan():
     try:
-        safe_print("\n========== START AI ==========")
-        
-        # 1. Verify Groq API Key
-        groq_api_key_loaded = os.environ.get("GROQ_API_KEY")
-        if groq_api_key_loaded:
-            safe_print("Groq API key loaded: Yes (Length: " + str(len(groq_api_key_loaded)) + ")")
-        else:
-            safe_print("Groq API key loaded: No")
-            
+        safe_print("\n========== START AI SCAN ANALYSIS ==========")
+
         if 'image' not in request.files:
             return jsonify({'error': 'No image uploaded'}), 400
 
@@ -416,13 +708,14 @@ def add_scan():
         if not patient_id:
             return jsonify({'error': 'patient_id required'}), 400
 
-        # Read image for base64 before cloudinary consumes it
+        patient_notes = form.get('notes', '')
+
+        # Read image bytes before Cloudinary consumes it
         image_bytes = image.read()
-        import base64
         base64_image = base64.b64encode(image_bytes).decode('utf-8')
         mime_type = image.mimetype if image.mimetype else 'image/jpeg'
-        
-        # Reset pointer for cloudinary
+
+        # Reset pointer for Cloudinary
         image.seek(0)
 
         # Upload image to Cloudinary with fallback
@@ -434,143 +727,27 @@ def add_scan():
             safe_print("Cloudinary upload fallback:", e)
             image_url = f"data:{mime_type};base64,{base64_image}"
 
-        # 3. Correct Vision Model
-        VISION_MODEL = "llama-3.2-11b-vision-preview"
-        
-        patient_notes = form.get('notes', 'None provided')
-        prompt = f"""You are examining a dental/oral photograph. Analyze it thoroughly.
+        # Perform local TensorFlow classification
+        safe_print("Running local TensorFlow inference...")
+        prediction_result = predict_dental_image(image_bytes)
 
-Patient's notes: {patient_notes}
+        condition = prediction_result["condition"]
+        severity = prediction_result["severity"]
+        findings = prediction_result["findings"]
+        recommendations = prediction_result["recommendations"]
+        summary = prediction_result["summary"]
+        analysis = prediction_result["analysis"]
 
-Provide your analysis in this exact structure:
+        safe_print(f"Predicted Condition: {condition}")
+        safe_print(f"Confidence: {prediction_result['confidence']:.4f}")
+        safe_print(f"Severity: {severity}")
 
-CONDITION DETECTED: (what dental condition you observe)
-PAIN SEVERITY: (None / Mild / Moderate / Severe)
-POSSIBLE DIAGNOSIS: (your clinical assessment)
-OBSERVATIONS: (what is visible in the image)
-AFFECTED TOOTH / REGION: (which area is affected)
-CONFIDENCE SCORE: (your confidence as a percentage, e.g. 75%)
-RECOMMENDED TREATMENT: (what treatment you suggest)
-URGENCY: (Low / Medium / High)
-
-Instructions:
-- Analyze the image carefully and provide ALL fields above.
-- Focus on visible dental features: teeth color, gum condition, alignment, decay, plaque, swelling, etc.
-- Always provide your best analysis even if image quality is not perfect.
-- Be specific and clinical in your observations."""
-
-        # 4 & 5. Sending request to Groq with complete payload logged
-        messages = [
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": prompt
-                    },
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": image_url
-                        }
-                    }
-                ]
-            }
-        ]
-        
-        safe_print("Sending request to Groq...")
-        safe_print(f"Payload Model: {VISION_MODEL}")
-        safe_print(f"Payload URL length: {len(image_url)}")
-        
-        if not client:
-            raise Exception("Groq client is None. API key might be missing.")
-
-        try:
-            response = client.chat.completions.create(
-                model=VISION_MODEL,
-                messages=messages,
-                temperature=0.2,
-                max_tokens=1024
-            )
-        except Exception as groq_err:
-            import traceback
-            safe_print(f"\n========== GROQ API ERROR ==========")
-            safe_print(f"Error type: {type(groq_err).__name__}")
-            safe_print(f"Error msg: {str(groq_err)}")
-            traceback.print_exc()
-            safe_print(f"=====================================")
-            return jsonify({'error': f'AI analysis failed: {str(groq_err)}'}), 500
-
-        # 6. Print the COMPLETE Groq response
-        safe_print("\n========== RAW GROQ RESPONSE ==========")
-        try:
-            raw_response_json = response.model_dump_json(indent=2)
-            safe_print(raw_response_json)
-        except Exception as e:
-            safe_print(f"Could not print raw response JSON: {e}")
-        safe_print("==========================================")
-
-        # 8. Guard against empty response
-        if not response.choices or not response.choices[0].message.content:
-            safe_print("[ERROR] Groq returned empty choices — model may have refused the request.")
-            return jsonify({'error': 'AI model returned an empty response. Please try again.'}), 500
-
-        raw_analysis = sanitize_text(response.choices[0].message.content)
-        
-        if not raw_analysis.strip():
-            safe_print("[ERROR] Groq returned empty text content.")
-            return jsonify({'error': 'AI model returned an empty text content. Please try again.'}), 500
-
-        analysis = clean_thinking_text(raw_analysis)
-        if not analysis.strip():
-            analysis = raw_analysis.strip()
-        analysis = sanitize_text(analysis)
-
-        severity = "Mild"
-        condition = "Dental Condition Detected"
-        findings = []
-        recommendations = []
-
-        # Simple parsing for structured data
-        for line in analysis.split('\n'):
-            line_str = line.strip()
-            if line_str.upper().startswith("CONDITION DETECTED:"):
-                condition = sanitize_text(line_str.split(":", 1)[1].strip())
-            elif line_str.upper().startswith("PAIN SEVERITY:") or line_str.upper().startswith("SEVERITY:"):
-                sev_val = line_str.split(":", 1)[1].strip().upper()
-                if "SEVERE" in sev_val:
-                    severity = "Severe"
-                elif "MODERATE" in sev_val:
-                    severity = "Moderate"
-                elif "NONE" in sev_val:
-                    severity = "None"
-                else:
-                    severity = "Mild"
-            elif line_str.upper().startswith("OBSERVATIONS:"):
-                findings.append(sanitize_text(line_str.split(":", 1)[1].strip()))
-            elif line_str.upper().startswith("RECOMMENDED TREATMENT:"):
-                recommendations.append(sanitize_text(line_str.split(":", 1)[1].strip()))
-
-        # Fallback if parsing failed
-        if not findings:
-            findings.append("See full analysis for details.")
-        if not recommendations:
-            recommendations.append("See full analysis for treatment recommendations.")
-
-        summary = analysis[:200] + "..." if len(analysis) > 200 else analysis
-
-        safe_print(f"Extracted analysis: {analysis[:100]}...")
-        safe_print(f"Summary: {summary[:50]}...")
-        safe_print(f"Findings: {findings}")
-        safe_print(f"Recommendations: {recommendations}")
-        
         safe_print("Saving to database...")
-        
         new_scan = Scan(
             patient_id=int(patient_id),
             patient_name=patient_name,
             image_url=image_url,
-            notes=sanitize_text(form.get('notes', '')),
+            notes=sanitize_text(patient_notes),
             condition=condition,
             severity=severity,
             findings=json.dumps(findings),
@@ -579,7 +756,7 @@ Instructions:
             summary=summary
         )
         db.session.add(new_scan)
-        
+
         # Save consultation automatically
         new_consult = Consultation(
             patient_id=int(patient_id),
@@ -588,11 +765,10 @@ Instructions:
             status='Pending'
         )
         db.session.add(new_consult)
-        
+
         db.session.commit()
         safe_print("Database save successful.")
-        safe_print("Returning JSON response.")
-        safe_print("========== END AI ==========\n")
+        safe_print("========== END AI SCAN ANALYSIS ==========\n")
 
         return jsonify({
             "message": "Scan saved",
@@ -620,11 +796,11 @@ def get_patient_scans(user_id):
 
     except Exception as e:
         db.session.rollback()
-        print("========== ERROR ==========")
-        print(e)
-        print("===========================")
+        safe_print("========== ERROR ==========")
+        safe_print(e)
+        safe_print("===========================")
         return jsonify({'error': str(e)}), 500
-# Dentist / admin: all scans, optional ?status=Pending or ?status=Reviewed
+
 @app.route('/scans', methods=['GET'])
 def get_all_scans():
     try:
@@ -647,7 +823,6 @@ def get_scan(scan_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# Dentist submits a review / recommendation on a scan
 @app.route('/scans/<int:scan_id>/review', methods=['POST'])
 def review_scan(scan_id):
     try:
@@ -665,7 +840,6 @@ def review_scan(scan_id):
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
-
 # ─────────────────────────────────────────
 # PAIN ASSESSMENTS
 # ─────────────────────────────────────────
@@ -678,55 +852,40 @@ def add_pain():
             return jsonify({'error': 'patient_id required'}), 400
 
         score = int(data.get('score', 0))
+        trigger = data.get('trigger', '')
+        swelling = bool(data.get('swelling', False))
+        sensitivity = bool(data.get('sensitivity', False))
+        bleeding = bool(data.get('bleeding', False))
 
-        symptoms = f"""
-Trigger: {data.get('trigger', '')}
-Swelling: {data.get('swelling', False)}
-Sensitivity: {data.get('sensitivity', False)}
-Bleeding: {data.get('bleeding', False)}
-"""
+        severity = data.get('severity', 'Mild')
 
-        prompt = f"""
-A patient has a dental pain score of {score}/100.
-
-Symptoms:
-{symptoms}
-
-Give:
-1. What this pain level means.
-2. Whether urgent dental care is needed.
-3. Safe home-care advice.
-
-Keep the answer under 120 words.
-"""
-
-        response = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a friendly dental assistant."
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ]
-        )
-
-        advice = clean_thinking_text(sanitize_text(response.choices[0].message.content))
+        if score >= 70 or severity == 'Severe' or swelling:
+            advice = (
+                f"High pain intensity ({score}/100) recorded. Urgent dental examination is recommended. "
+                "Apply an external cold compress to minimize swelling and take over-the-counter analgesics as advised by your healthcare provider. Avoid hard, hot, or cold foods."
+            )
+        elif score >= 40 or severity == 'Moderate' or bleeding:
+            advice = (
+                f"Moderate pain intensity ({score}/100) recorded. Schedule a dental appointment soon. "
+                "Rinse gently with warm salt water, maintain light brushing, and avoid chewing on the affected side."
+            )
+        else:
+            advice = (
+                f"Mild dental discomfort ({score}/100) recorded. Continue careful brushing and flossing. "
+                "If discomfort persists or worsens, consult your dentist for a routine checkup."
+            )
 
         pain = PainAssessment(
             patient_id=int(data['patient_id']),
             patient_name=data.get('patient_name', ''),
             intensity=int(data.get('intensity', 0)),
             duration=data.get('duration', ''),
-            trigger=data.get('trigger', ''),
-            swelling=bool(data.get('swelling', False)),
-            sensitivity=bool(data.get('sensitivity', False)),
-            bleeding=bool(data.get('bleeding', False)),
+            trigger=trigger,
+            swelling=swelling,
+            sensitivity=sensitivity,
+            bleeding=bleeding,
             score=score,
-            severity=data.get('severity', 'Mild'),
+            severity=severity,
             advice=advice,
         )
 
@@ -751,9 +910,11 @@ def get_patient_pain_assessments(user_id):
         return jsonify([pain_to_json(p) for p in pains]), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
 # ─────────────────────────────────────────
 # ANESTHESIA PREDICTIONS
 # ─────────────────────────────────────────
+
 @app.route('/anesthesia', methods=['POST'])
 def add_anesthesia():
     try:
@@ -762,63 +923,41 @@ def add_anesthesia():
         if not data or 'patient_id' not in data:
             return jsonify({'error': 'patient_id required'}), 400
 
-        prompt = f"""
-Assess the likelihood of LOCAL ANESTHESIA FAILURE.
+        infection = data.get('infection', 'No')
+        inflammation = data.get('inflammation', 'Mild')
+        anxiety = data.get('anxiety', 'Low')
+        history = data.get('history', 'No')
 
-Patient details:
-- Age: {data.get('age')}
-- Gender: {data.get('gender')}
-- Tooth/Region: {data.get('region')}
-- Existing infection: {data.get('infection')}
-- Inflammation: {data.get('inflammation')}
-- Anxiety: {data.get('anxiety')}
-- Previous anesthesia failure: {data.get('history')}
-- Medical conditions: {data.get('medical_conditions')}
-- Current medications: {data.get('medications')}
-
-Return exactly:
-
-RISK LEVEL:
-CONFIDENCE:
-KEY FACTORS:
-RECOMMENDATIONS FOR DENTIST:
-"""
-
-        response = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a clinical decision-support assistant for dentists."
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ]
-        )
-
-        result = clean_thinking_text(sanitize_text(response.choices[0].message.content))
-
-        if "High" in result:
-            risk = "High"
-        elif "Moderate" in result:
-            risk = "Moderate"
+        if infection == 'Yes' or history == 'Yes' or inflammation == 'Severe':
+            risk = 'High'
+            conf_val = 88.0
+        elif inflammation == 'Moderate' or anxiety == 'High':
+            risk = 'Moderate'
+            conf_val = 82.0
         else:
-            risk = "Low"
+            risk = 'Low'
+            conf_val = 90.0
+
+        result = (
+            f"RISK LEVEL: {risk}\n"
+            f"CONFIDENCE: {conf_val}%\n"
+            f"KEY FACTORS: Infection: {infection}, Inflammation: {inflammation}, Anxiety: {anxiety}, Prior Failure: {history}\n"
+            f"RECOMMENDATIONS FOR DENTIST: "
+            f"{'Consider nerve block buffering, supplemental infiltration, or alternative local anesthetics due to tissue inflammation/infection.' if risk != 'Low' else 'Proceed with standard local anesthesia technique.'}"
+        )
 
         pred = AnesthesiaPrediction(
             patient_id=int(data['patient_id']),
             patient_name=data.get('patient_name', ''),
             region=data.get('region', ''),
-            infection=data.get('infection', 'No'),
-            inflammation=data.get('inflammation', 'Mild'),
-            anxiety=data.get('anxiety', 'Low'),
-            history=data.get('history', 'No'),
+            infection=infection,
+            inflammation=inflammation,
+            anxiety=anxiety,
+            history=history,
             medical_conditions=data.get('medical_conditions', ''),
             medications=data.get('medications', ''),
             risk_level=risk,
-            confidence=0,
+            confidence=conf_val,
             result=result,
         )
 
@@ -844,7 +983,6 @@ def get_patient_anesthesia(user_id):
         return jsonify([anesthesia_to_json(a) for a in rows]), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
 
 # ─────────────────────────────────────────
 # APPOINTMENTS
@@ -891,7 +1029,6 @@ def get_dentist_appointments(dentist_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# Dentist / admin: all appointments
 @app.route('/appointments', methods=['GET'])
 def get_all_appointments():
     try:
@@ -900,7 +1037,6 @@ def get_all_appointments():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# Dentist confirms / declines: {status: "Confirmed"|"Declined"}
 @app.route('/appointments/<int:appt_id>/status', methods=['POST'])
 def update_appointment_status(appt_id):
     try:
@@ -918,7 +1054,6 @@ def update_appointment_status(appt_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
-
 
 # ─────────────────────────────────────────
 # CONSULTATIONS
@@ -954,7 +1089,6 @@ def get_patient_consultations(user_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# Dentist / admin: all consultations, optional ?status=Pending
 @app.route('/consultations', methods=['GET'])
 def get_all_consultations():
     try:
@@ -967,7 +1101,6 @@ def get_all_consultations():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# Dentist replies: {dentist_id, reply}
 @app.route('/consultations/<int:consult_id>/reply', methods=['POST'])
 def reply_consultation(consult_id):
     try:
@@ -985,12 +1118,10 @@ def reply_consultation(consult_id):
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
-
 # ─────────────────────────────────────────
 # DENTIST VIEWS
 # ─────────────────────────────────────────
 
-# Patient list for the dentist — one summarised row per patient.
 @app.route('/dentist/patients', methods=['GET'])
 def dentist_patients():
     try:
@@ -1004,13 +1135,13 @@ def dentist_patients():
                 .order_by(PainAssessment.created_at.desc()).first()
             latest_anes = AnesthesiaPrediction.query.filter_by(patient_id=p.id)\
                 .order_by(AnesthesiaPrediction.created_at.desc()).first()
-            
+
             is_high_risk = False
             if latest_scan and latest_scan.severity == 'Severe':
                 is_high_risk = True
             elif latest_anes and latest_anes.risk_level == 'High':
                 is_high_risk = True
-                
+
             result.append({
                 'id': p.id,
                 'name': p.name,
@@ -1026,7 +1157,6 @@ def dentist_patients():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# Full patient detail for the dentist — matches patient_detail.dart keys.
 @app.route('/dentist/patient/<int:patient_id>', methods=['GET'])
 def dentist_patient_detail(patient_id):
     try:
@@ -1057,7 +1187,6 @@ def dentist_patient_detail(patient_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-
 # ─────────────────────────────────────────
 # ADMIN
 # ─────────────────────────────────────────
@@ -1065,7 +1194,7 @@ def dentist_patient_detail(patient_id):
 @app.route('/users', methods=['GET'])
 def get_users():
     try:
-        role = request.args.get('role')   # optional: patient | dentist
+        role = request.args.get('role')
         q = User.query
         if role:
             q = q.filter_by(role=role)
@@ -1104,7 +1233,6 @@ def admin_stats():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-
 # ─────────────────────────────────────────
 # PATIENT HOME DASHBOARD (aggregate endpoint)
 # ─────────────────────────────────────────
@@ -1126,7 +1254,6 @@ def get_dashboard(user_id):
         }), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
 
 @app.route('/', methods=['GET'])
 def health():
@@ -1153,8 +1280,10 @@ def reset_password():
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
 with app.app_context():
     db.create_all()
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
